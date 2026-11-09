@@ -111,6 +111,32 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /auth/recuperacion:
+    post:
+      tags: [Autenticación]
+      summary: Solicitar recuperación de contraseña (HU-04)
+      description: Ruta pública. Procesa y simula el envío de instrucciones de restablecimiento.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecuperacionPasswordRequest'
+            example:
+              email: "conductor@tire.com"
+      responses:
+        '200':
+          description: Solicitud de recuperación procesada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+              example:
+                mensaje: "Si el correo está registrado, se enviaron las instrucciones de recuperación."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /conductores:
     post:
       tags: [Conductores]
@@ -491,6 +517,23 @@ paths:
     get:
       tags: [Flota y Alertas]
       summary: Listar incidentes atendidos (DESPACHADOR)
+      parameters:
+        - name: fechaInicio
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Fecha y hora inicial del filtro (ISO-8601).
+          example: "2026-11-01T00:00:00"
+        - name: fechaFin
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Fecha y hora final del filtro (ISO-8601).
+          example: "2026-11-30T23:59:59"
       responses:
         '200':
           description: Alertas críticas ya atendidas.
@@ -665,6 +708,22 @@ components:
           format: password
           minLength: 8
           example: "NuevaPassword456"
+
+    RecuperacionPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "conductor@tire.com"
+
+    MensajeResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          example: "Si el correo está registrado, se enviaron las instrucciones de recuperación."
 
     AuthResponse:
       type: object

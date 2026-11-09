@@ -160,6 +160,7 @@ JWT) obtenido de `POST /auth/sesion` para probar los endpoints protegidos.
 | POST | `/auth/registro` | Público | Registrar usuario |
 | POST | `/auth/sesion` | Público | Iniciar sesión (devuelve JWT) |
 | PUT | `/auth/contrasena` | Autenticado | Cambiar contraseña |
+| POST | `/auth/recuperacion` | Público | Solicitar recuperación de contraseña (HU-04) |
 | POST/GET | `/conductores` | DESPACHADOR | Crear / listar conductores |
 | GET/PATCH/DELETE | `/conductores/{id}` | DESPACHADOR | Consultar / actualizar / desactivar |
 | POST | `/viajes` | CONDUCTOR | Iniciar viaje |

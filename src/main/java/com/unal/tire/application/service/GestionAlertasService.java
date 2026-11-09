@@ -7,6 +7,7 @@ import com.unal.tire.domain.exception.RecursoNoEncontradoException;
 import com.unal.tire.domain.model.AlertaCritica;
 import com.unal.tire.domain.model.Viaje;
 import com.unal.tire.domain.valueobject.EstadoViaje;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,27 @@ public class GestionAlertasService implements GestionAlertasUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<AlertaCritica> listarIncidentesAtendidos() {
-        return alertaRepository.listarPorAtendida(true);
+        return listarIncidentesAtendidos(null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AlertaCritica> listarIncidentesAtendidos(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+        List<AlertaCritica> incidentes = alertaRepository.listarPorAtendida(true);
+        if (fechaInicio == null && fechaFin == null) {
+            return incidentes;
+        }
+        return incidentes.stream()
+                .filter(a -> {
+                    LocalDateTime fecha = a.getFechaApertura() != null ? a.getFechaApertura() : a.getFechaAtencion();
+                    if (fecha == null) {
+                        return true;
+                    }
+                    boolean cumpleInicio = fechaInicio == null || !fecha.isBefore(fechaInicio);
+                    boolean cumpleFin = fechaFin == null || !fecha.isAfter(fechaFin);
+                    return cumpleInicio && cumpleFin;
+                })
+                .toList();
     }
 
     @Override

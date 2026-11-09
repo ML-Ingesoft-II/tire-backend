@@ -7,10 +7,12 @@ import com.unal.tire.application.port.out.ClaimsAutenticacion;
 import com.unal.tire.domain.model.Usuario;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.CambioPasswordDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.LoginRequestDto;
+import com.unal.tire.infrastructure.adapter.in.rest.dto.RecuperacionPasswordDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.RegistroRequestDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.RegistroResponseDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.TokenResponseDto;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -61,5 +63,13 @@ public class AuthController {
                 request.passwordActual(),
                 request.passwordNueva());
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/recuperacion")
+    public ResponseEntity<Map<String, String>> recuperarContrasena(
+            @Valid @RequestBody RecuperacionPasswordDto request) {
+        autenticacionUseCase.solicitarRecuperacion(request.email());
+        return ResponseEntity.ok(Map.of(
+                "mensaje", "Si el correo está registrado, se enviaron las instrucciones de recuperación."));
     }
 }

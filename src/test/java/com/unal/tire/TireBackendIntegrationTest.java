@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -297,5 +298,175 @@ class TireBackendIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].viajeId", is(viajeId)))
                 .andExpect(jsonPath("$[0].atendida", is(false)));
+    }
+
+    // ---- HU-04: Recuperacion de contrasena ----
+    @Test
+    void recuperacionContrasenaDevuelve200() throws Exception {
+        mockMvc.perform(post("/auth/recuperacion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"conductor@tire.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensaje").exists());
+
+        // Email invalido -> 400
+        mockMvc.perform(post("/auth/recuperacion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalido\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
+    // ---- Cambio de contrasena autenticado ----
+    @Test
+    void cambioContrasenaAutenticado() throws Exception {
+        // Con contrasena actual correcta -> 200
+        mockMvc.perform(put("/auth/contrasena")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"passwordActual\":\"Password123\",\"passwordNueva\":\"NuevaPassword123\"}"))
+                .andExpect(status().isOk());
+
+        // Con contrasena actual incorrecta -> 401
+        mockMvc.perform(put("/auth/contrasena")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"passwordActual\":\"Incorrecta123\",\"passwordNueva\":\"OtraPassword123\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---- Invariante 3: Umbral minimo de microsueno (>= 1.5 s) ----
+    @Test
+    void microsuenoMenorAUmbralDevuelve400() throws Exception {
+        String iniciar = """
+                {"origen":"Bogota","destino":"Ibague"}
+                """;
+        MvcResult viaje = mockMvc.perform(post("/viajes")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(iniciar))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String viajeId = objectMapper.readTree(viaje.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // Duracion 1.2 s < 1.5 s -> 400 Bad Request
+        mockMvc.perform(post("/viajes/" + viajeId + "/eventos")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracionOjosCerradosSegundos\":1.2,\"confirmadoPorConductor\":false}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
+    // ---- Cancelacion de viaje: sin eventos 204 y con eventos 409 ----
+    @Test
+    void cancelarViajeSinEventos204YConEventos409() throws Exception {
+        String iniciar = """
+                {"origen":"Bogota","destino":"Tunja"}
+                """;
+        MvcResult viaje1 = mockMvc.perform(post("/viajes")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(iniciar))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String viajeId1 = objectMapper.readTree(viaje1.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // Sin eventos -> 204 No Content
+        mockMvc.perform(delete("/viajes/" + viajeId1)
+                        .header("Authorization", "Bearer " + conductorToken))
+                .andExpect(status().isNoContent());
+
+        // Nuevo viaje con eventos
+        MvcResult viaje2 = mockMvc.perform(post("/viajes")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(iniciar))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String viajeId2 = objectMapper.readTree(viaje2.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // Registrar evento
+        mockMvc.perform(post("/viajes/" + viajeId2 + "/eventos")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracionOjosCerradosSegundos\":2.0,\"confirmadoPorConductor\":false}"))
+                .andExpect(status().isCreated());
+
+        // Con eventos -> 409 Conflict
+        mockMvc.perform(delete("/viajes/" + viajeId2)
+                        .header("Authorization", "Bearer " + conductorToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status", is(409)));
+    }
+
+    // ---- Flujo completo despachador: estado, atender alertas, incidentes y confirmacion ----
+    @Test
+    void flujoCompletoAlertasEIncidentesYFiltros() throws Exception {
+        String iniciar = """
+                {"origen":"Bogota","destino":"Villavicencio"}
+                """;
+        MvcResult viaje = mockMvc.perform(post("/viajes")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(iniciar))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String viajeId = objectMapper.readTree(viaje.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // Generar evento critico para abrir alerta
+        mockMvc.perform(post("/viajes/" + viajeId + "/eventos")
+                        .header("Authorization", "Bearer " + conductorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracionOjosCerradosSegundos\":2.0,\"confirmadoPorConductor\":false}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nivelAlerta", is("CRITICO")));
+
+        // Consultar estado de la flota (DESPACHADOR)
+        mockMvc.perform(get("/flota/estado")
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalViajesActivos").value(1));
+
+        // Obtener ID de la alerta abierta
+        MvcResult alertasRes = mockMvc.perform(get("/alertas")
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].atendida", is(false)))
+                .andReturn();
+
+        String alertaId = objectMapper.readTree(alertasRes.getResponse().getContentAsString())
+                .get(0).get("id").asText();
+
+        // Atender alerta -> pasa a incidente atendido
+        mockMvc.perform(patch("/alertas/" + alertaId + "/atender")
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"notas\":\"Se contacto al conductor, todo en orden.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atendida", is(true)))
+                .andExpect(jsonPath("$.notasDespachador", is("Se contacto al conductor, todo en orden.")));
+
+        // Listar incidentes atendidos con filtros de fecha
+        mockMvc.perform(get("/incidentes")
+                        .param("fechaInicio", "2026-01-01T00:00:00")
+                        .param("fechaFin", "2026-12-31T23:59:59")
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id", is(alertaId)));
+
+        // Conductor confirma alerta en viaje (HU-16): CRITICO -> PRECAUCION
+        mockMvc.perform(patch("/viajes/" + viajeId + "/confirmar-alerta")
+                        .header("Authorization", "Bearer " + conductorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nivelAlerta", is("PRECAUCION")));
     }
 }

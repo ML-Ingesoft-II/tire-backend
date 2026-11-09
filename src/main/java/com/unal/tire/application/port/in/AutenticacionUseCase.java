@@ -13,4 +13,6 @@ public interface AutenticacionUseCase {
     RespuestaToken iniciarSesion(String email, String password);
 
     void cambiarContrasena(UUID usuarioId, String passwordActual, String passwordNueva);
+
+    void solicitarRecuperacion(String email);
 }

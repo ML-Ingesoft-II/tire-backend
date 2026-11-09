@@ -5,11 +5,26 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "despachadorToken", "value": "" },
-    { "key": "conductorToken", "value": "" },
-    { "key": "conductorId", "value": "" },
-    { "key": "viajeId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "despachadorToken",
+      "value": ""
+    },
+    {
+      "key": "conductorToken",
+      "value": ""
+    },
+    {
+      "key": "conductorId",
+      "value": ""
+    },
+    {
+      "key": "viajeId",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -29,12 +44,26 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"nombre\": \"Maria Despachadora\",\n  \"email\": \"despachador@tire.com\",\n  \"password\": \"Password123\",\n  \"rol\": \"DESPACHADOR\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] }
+        "url": {
+          "raw": "{{baseUrl}}/auth/registro",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "registro"
+          ]
+        }
       }
     },
     {
@@ -56,12 +85,26 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"despachador@tire.com\",\n  \"password\": \"Password123\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/auth/sesion", "host": ["{{baseUrl}}"], "path": ["auth", "sesion"] }
+        "url": {
+          "raw": "{{baseUrl}}/auth/sesion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "sesion"
+          ]
+        }
       }
     },
     {
@@ -81,12 +124,26 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"nombre\": \"Pedro Conductor\",\n  \"email\": \"conductor@tire.com\",\n  \"password\": \"Password123\",\n  \"rol\": \"CONDUCTOR\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] }
+        "url": {
+          "raw": "{{baseUrl}}/auth/registro",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "registro"
+          ]
+        }
       }
     },
     {
@@ -107,12 +164,65 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"conductor@tire.com\",\n  \"password\": \"Password123\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/auth/sesion", "host": ["{{baseUrl}}"], "path": ["auth", "sesion"] }
+        "url": {
+          "raw": "{{baseUrl}}/auth/sesion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "sesion"
+          ]
+        }
+      }
+    },
+    {
+      "name": "04b - Recuperacion de contrasena (200 HU-04)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test(\"Mensaje de confirmacion\", function () { pm.expect(json.mensaje).to.be.a(\"string\"); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"conductor@tire.com\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/recuperacion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "recuperacion"
+          ]
+        }
       }
     },
     {
@@ -132,7 +242,15 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+        "url": {
+          "raw": "{{baseUrl}}/conductores",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores"
+          ]
+        }
       }
     },
     {
@@ -152,14 +270,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"nombre\": \"Intruso\",\n  \"documento\": \"CC-999\",\n  \"correo\": \"intruso@tire.com\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+        "url": {
+          "raw": "{{baseUrl}}/conductores",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores"
+          ]
+        }
       }
     },
     {
@@ -179,14 +311,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"nombre\": \"Pedro\",\n  \"documento\": \"CC-1\",\n  \"correo\": \"\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+        "url": {
+          "raw": "{{baseUrl}}/conductores",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores"
+          ]
+        }
       }
     },
     {
@@ -208,14 +354,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"nombre\": \"Pedro Conductor\",\n  \"documento\": \"CC-1024\",\n  \"correo\": \"pedro.conductor@tire.com\",\n  \"telefono\": \"3001234567\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+        "url": {
+          "raw": "{{baseUrl}}/conductores",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores"
+          ]
+        }
       }
     },
     {
@@ -234,11 +394,21 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{despachadorToken}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/conductores/{{conductorId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["conductores", "{{conductorId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores",
+            "{{conductorId}}"
+          ]
         }
       }
     },
@@ -259,8 +429,14 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -268,8 +444,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/conductores/{{conductorId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["conductores", "{{conductorId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores",
+            "{{conductorId}}"
+          ]
         }
       }
     },
@@ -290,14 +471,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Medellin\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+        "url": {
+          "raw": "{{baseUrl}}/viajes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes"
+          ]
+        }
       }
     },
     {
@@ -320,14 +515,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Medellin\",\n  \"latitudInicial\": 4.711,\n  \"longitudInicial\": -74.0721\n}"
         },
-        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+        "url": {
+          "raw": "{{baseUrl}}/viajes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes"
+          ]
+        }
       }
     },
     {
@@ -347,14 +556,28 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Cali\"\n}"
         },
-        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+        "url": {
+          "raw": "{{baseUrl}}/viajes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes"
+          ]
+        }
       }
     },
     {
@@ -374,8 +597,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -383,8 +612,14 @@
         },
         "url": {
           "raw": "{{baseUrl}}/viajes/{{viajeId}}/telemetria",
-          "host": ["{{baseUrl}}"],
-          "path": ["viajes", "{{viajeId}}", "telemetria"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes",
+            "{{viajeId}}",
+            "telemetria"
+          ]
         }
       }
     },
@@ -405,8 +640,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -414,8 +655,14 @@
         },
         "url": {
           "raw": "{{baseUrl}}/viajes/{{viajeId}}/eventos",
-          "host": ["{{baseUrl}}"],
-          "path": ["viajes", "{{viajeId}}", "eventos"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes",
+            "{{viajeId}}",
+            "eventos"
+          ]
         }
       }
     },
@@ -435,11 +682,22 @@
       ],
       "request": {
         "method": "PATCH",
-        "header": [{ "key": "Authorization", "value": "Bearer {{conductorToken}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{conductorToken}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/viajes/{{viajeId}}/finalizar",
-          "host": ["{{baseUrl}}"],
-          "path": ["viajes", "{{viajeId}}", "finalizar"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "viajes",
+            "{{viajeId}}",
+            "finalizar"
+          ]
         }
       }
     },
@@ -459,11 +717,64 @@
       ],
       "request": {
         "method": "DELETE",
-        "header": [{ "key": "Authorization", "value": "Bearer {{despachadorToken}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/conductores/{{conductorId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["conductores", "{{conductorId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "conductores",
+            "{{conductorId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "18 - GET /incidentes con filtros (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Respuesta es array\", function () { pm.expect(Array.isArray(pm.response.json())).to.be.true; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{despachadorToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/incidentes?fechaInicio=2026-01-01T00:00:00&fechaFin=2026-12-31T23:59:59",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "incidentes"
+          ],
+          "query": [
+            {
+              "key": "fechaInicio",
+              "value": "2026-01-01T00:00:00"
+            },
+            {
+              "key": "fechaFin",
+              "value": "2026-12-31T23:59:59"
+            }
+          ]
         }
       }
     }

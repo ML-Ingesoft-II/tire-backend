@@ -98,4 +98,15 @@ public class AutenticacionService implements AutenticacionUseCase {
         usuario.setPasswordHash(proveedorAutenticacion.hashearContrasena(passwordNueva));
         usuarioRepository.guardar(usuario);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void solicitarRecuperacion(String email) {
+        // Criterio HU-04: simular y procesar solicitud de recuperacion de contrasena.
+        // Se valida existencia sin filtrar informacion sensible al exterior (prevencion de user enumeration).
+        usuarioRepository.buscarPorEmail(email).ifPresent(usuario -> {
+            // En un entorno productivo aqui se generaria un token de restablecimiento
+            // con vigencia limitada y se enviaria por correo electronico.
+        });
+    }
 }

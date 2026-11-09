@@ -2,6 +2,7 @@ package com.unal.tire.application.port.in;
 
 import com.unal.tire.domain.model.AlertaCritica;
 import com.unal.tire.domain.model.Viaje;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +17,8 @@ public interface GestionAlertasUseCase {
     List<AlertaCritica> listarAlertasAbiertas();
 
     List<AlertaCritica> listarIncidentesAtendidos();
+
+    List<AlertaCritica> listarIncidentesAtendidos(LocalDateTime fechaInicio, LocalDateTime fechaFin);
 
     AlertaCritica atenderAlerta(UUID alertaId, String notas);
 }
