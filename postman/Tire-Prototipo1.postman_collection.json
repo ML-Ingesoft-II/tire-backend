@@ -1,0 +1,471 @@
+{
+  "info": {
+    "name": "Tire - Prototipo 1",
+    "description": "Coleccion de pruebas de extremo a extremo para el backend Tire. Ejecutar en orden secuencial con el Collection Runner usando el entorno 'Tire - Local'. Valida 201/200/400/401/403/409, la invariante HU-09 y el patron State de alerta.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "despachadorToken", "value": "" },
+    { "key": "conductorToken", "value": "" },
+    { "key": "conductorId", "value": "" },
+    { "key": "viajeId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Registrar Despachador",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created o 409 (ya existe)', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Maria Despachadora\",\n  \"email\": \"despachador@tire.com\",\n  \"password\": \"Password123\",\n  \"rol\": \"DESPACHADOR\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] }
+      }
+    },
+    {
+      "name": "02 - Login Despachador",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Devuelve accessToken', function () { pm.expect(json.accessToken).to.be.a('string'); });",
+              "pm.test('tipo es Bearer', function () { pm.expect(json.tipo).to.eql('Bearer'); });",
+              "pm.collectionVariables.set('despachadorToken', json.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"despachador@tire.com\",\n  \"password\": \"Password123\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/sesion", "host": ["{{baseUrl}}"], "path": ["auth", "sesion"] }
+      }
+    },
+    {
+      "name": "03 - Registrar Conductor",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created o 409 (ya existe)', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Pedro Conductor\",\n  \"email\": \"conductor@tire.com\",\n  \"password\": \"Password123\",\n  \"rol\": \"CONDUCTOR\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] }
+      }
+    },
+    {
+      "name": "04 - Login Conductor",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Devuelve accessToken', function () { pm.expect(json.accessToken).to.be.a('string'); });",
+              "pm.collectionVariables.set('conductorToken', json.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"conductor@tire.com\",\n  \"password\": \"Password123\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/sesion", "host": ["{{baseUrl}}"], "path": ["auth", "sesion"] }
+      }
+    },
+    {
+      "name": "05 - GET /conductores SIN token (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', function () { pm.response.to.have.status(401); });",
+              "pm.test('ProblemDetails status 401', function () { pm.expect(pm.response.json().status).to.eql(401); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+      }
+    },
+    {
+      "name": "06 - POST /conductores con token CONDUCTOR (403)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403 Forbidden', function () { pm.response.to.have.status(403); });",
+              "pm.test('ProblemDetails status 403', function () { pm.expect(pm.response.json().status).to.eql(403); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Intruso\",\n  \"documento\": \"CC-999\",\n  \"correo\": \"intruso@tire.com\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+      }
+    },
+    {
+      "name": "07 - POST /conductores datos invalidos (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', function () { pm.response.to.have.status(400); });",
+              "pm.test('ProblemDetails status 400', function () { pm.expect(pm.response.json().status).to.eql(400); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Pedro\",\n  \"documento\": \"CC-1\",\n  \"correo\": \"\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+      }
+    },
+    {
+      "name": "08 - POST /conductores datos validos (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('activo es true', function () { pm.expect(json.activo).to.eql(true); });",
+              "pm.collectionVariables.set('conductorId', json.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Pedro Conductor\",\n  \"documento\": \"CC-1024\",\n  \"correo\": \"pedro.conductor@tire.com\",\n  \"telefono\": \"3001234567\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/conductores", "host": ["{{baseUrl}}"], "path": ["conductores"] }
+      }
+    },
+    {
+      "name": "09 - GET /conductores/{{conductorId}} (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "pm.test('Devuelve el mismo id', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('conductorId')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{despachadorToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/conductores/{{conductorId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["conductores", "{{conductorId}}"]
+        }
+      }
+    },
+    {
+      "name": "10 - PATCH /conductores/{{conductorId}} (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "pm.test('telefono actualizado', function () { pm.expect(pm.response.json().telefono).to.eql('3009998888'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"telefono\": \"3009998888\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/conductores/{{conductorId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["conductores", "{{conductorId}}"]
+        }
+      }
+    },
+    {
+      "name": "11 - POST /viajes con token DESPACHADOR (403)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403 Forbidden', function () { pm.response.to.have.status(403); });",
+              "pm.test('ProblemDetails status 403', function () { pm.expect(pm.response.json().status).to.eql(403); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{despachadorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Medellin\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+      }
+    },
+    {
+      "name": "12 - POST /viajes con token CONDUCTOR (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('estado EN_CURSO', function () { pm.expect(json.estado).to.eql('EN_CURSO'); });",
+              "pm.test('nivelAlerta NORMAL', function () { pm.expect(json.nivelAlerta).to.eql('NORMAL'); });",
+              "pm.collectionVariables.set('viajeId', json.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Medellin\",\n  \"latitudInicial\": 4.711,\n  \"longitudInicial\": -74.0721\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+      }
+    },
+    {
+      "name": "13 - POST /viajes segundo viaje activo (409 HU-09)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('409 Conflict', function () { pm.response.to.have.status(409); });",
+              "pm.test('Detalle HU-09', function () { pm.expect(pm.response.json().detail).to.include('viaje activo'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"origen\": \"Bogota\",\n  \"destino\": \"Cali\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/viajes", "host": ["{{baseUrl}}"], "path": ["viajes"] }
+      }
+    },
+    {
+      "name": "14 - POST /viajes/{{viajeId}}/telemetria (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "pm.test('Clima enriquecido presente', function () { pm.expect(pm.response.json().ultimoClima).to.not.eql(null); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitud\": 5.5353,\n  \"longitud\": -73.3678\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/viajes/{{viajeId}}/telemetria",
+          "host": ["{{baseUrl}}"],
+          "path": ["viajes", "{{viajeId}}", "telemetria"]
+        }
+      }
+    },
+    {
+      "name": "15 - POST /viajes/{{viajeId}}/eventos microsueno 2.0s (201 -> CRITICO)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+              "pm.test('nivelAlerta CRITICO', function () { pm.expect(pm.response.json().nivelAlerta).to.eql('CRITICO'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{conductorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitud\": 5.5353,\n  \"longitud\": -73.3678,\n  \"duracionOjosCerradosSegundos\": 2.0,\n  \"confirmadoPorConductor\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/viajes/{{viajeId}}/eventos",
+          "host": ["{{baseUrl}}"],
+          "path": ["viajes", "{{viajeId}}", "eventos"]
+        }
+      }
+    },
+    {
+      "name": "16 - PATCH /viajes/{{viajeId}}/finalizar (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "pm.test('estado FINALIZADO', function () { pm.expect(pm.response.json().estado).to.eql('FINALIZADO'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{conductorToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/viajes/{{viajeId}}/finalizar",
+          "host": ["{{baseUrl}}"],
+          "path": ["viajes", "{{viajeId}}", "finalizar"]
+        }
+      }
+    },
+    {
+      "name": "17 - DELETE /conductores/{{conductorId}} (200, activo=false)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+              "pm.test('activo === false', function () { pm.expect(pm.response.json().activo).to.eql(false); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{despachadorToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/conductores/{{conductorId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["conductores", "{{conductorId}}"]
+        }
+      }
+    }
+  ]
+}
