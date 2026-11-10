@@ -1,0 +1,12 @@
+{
+  "name": "tire-backend",
+  "version": "1.0.0",
+  "description": "Tire Backend & tire_alert_service",
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix tire_alert_service test",
+    "test:coverage": "npm --prefix tire_alert_service run test:coverage",
+    "build": "npm --prefix tire_alert_service run build",
+    "start": "npm --prefix tire_alert_service start"
+  }
+}

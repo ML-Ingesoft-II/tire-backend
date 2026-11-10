@@ -1,5 +1,8 @@
 # Compiled output
 target/
+dist/
+coverage/
+node_modules/
 
 # Environment variables / secrets
 .env
