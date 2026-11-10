@@ -5,9 +5,32 @@ info:
     Backend del sistema Tire: prevención de accidentes viales por microsueños en
     conductores de transporte de carga y particulares. Conecta la App Móvil
     (rol CONDUCTOR) y el Panel Web (rol DESPACHADOR) bajo Arquitectura Hexagonal.
-    Autenticación mediante JWT de vida corta; errores en formato RFC 9457
-    (application/problem+json).
-  version: 1.0.0
+
+
+    **Autenticación:** JWT de vida corta (`accessToken`) más un `refreshToken`
+    para renovar la sesión sin pedir credenciales (HU-18).
+
+
+    **Alcance por flota:** todo lo que consulta o modifica un DESPACHADOR se
+    limita a la flota indicada en su token (`flotaId`). Un CONDUCTOR solo ve y
+    modifica sus propios viajes. Un recurso de otra flota u otro conductor
+    responde 404.
+
+
+    **Contraseña inicial:** mientras un conductor de flota no cambie su
+    contraseña inicial (`debeCambiarPassword=true`), cualquier endpoint distinto
+    de `PUT /auth/contrasena` y `POST /auth/renovar` responde 403 con
+    `type = .../problems/password-change-required` (HU-03).
+
+
+    **Errores:** formato RFC 9457 (application/problem+json).
+
+
+    **Actualización del panel:** el Panel Web consulta `GET /flota/estado` y
+    `GET /alertas` cada 5 segundos. Si una consulta falla, muestra
+    "Reconectando…" y, al recuperar la conexión, la siguiente consulta trae las
+    alertas abiertas que llegaron mientras tanto (HU-20, HU-23).
+  version: 1.1.0
   contact:
     name: Equipo Tire - Universidad Nacional de Colombia
   license:
@@ -21,13 +44,13 @@ servers:
 
 tags:
   - name: Autenticación
-    description: Registro, inicio de sesión y cambio de contraseña.
+    description: Registro, sesión, renovación, cambio y recuperación de contraseña (HU-01 a HU-04).
   - name: Conductores
-    description: CRUD de conductores (exclusivo rol DESPACHADOR).
+    description: Gestión de los conductores de la flota del despachador (HU-05, HU-06).
   - name: Viajes
-    description: Ciclo de vida de viajes, telemetría y eventos de fatiga.
+    description: Ciclo de vida del viaje, telemetría y eventos de fatiga (HU-09, HU-10, HU-16 a HU-18, HU-25, HU-26).
   - name: Flota y Alertas
-    description: Panorama de flota e incidentes (exclusivo rol DESPACHADOR).
+    description: Estado de la flota, alertas críticas e historial del turno (HU-20, HU-23, HU-24).
 
 security:
   - bearerAuth: []
@@ -36,8 +59,11 @@ paths:
   /auth/registro:
     post:
       tags: [Autenticación]
-      summary: Registrar un nuevo usuario
-      description: Ruta pública. Crea un usuario (CONDUCTOR o DESPACHADOR).
+      summary: Crear cuenta de conductor particular
+      description: >
+        Ruta pública. Siempre crea un usuario con rol CONDUCTOR y sin flota
+        (conductor particular). Los conductores de flota los crea el despachador
+        con `POST /conductores`; los despachadores se crean por datos iniciales.
       security: []
       requestBody:
         required: true
@@ -46,28 +72,34 @@ paths:
             schema:
               $ref: '#/components/schemas/RegistroRequest'
             example:
-              nombre: "María Despachadora"
-              email: "despachador@tire.com"
-              password: "Password123"
-              rol: "DESPACHADOR"
-              flotaId: "11111111-1111-1111-1111-111111111111"
+              nombre: "Carlos Rodríguez"
+              email: "carlos@correo.com"
+              password: "Viaje2026"
+              aceptaTratamientoDatos: true
       responses:
         '201':
-          description: Usuario creado.
+          description: Cuenta creada. La app lleva al usuario al inicio de sesión.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/UsuarioResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: El correo ya está registrado ("Este correo ya tiene una cuenta").
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /auth/sesion:
     post:
       tags: [Autenticación]
       summary: Iniciar sesión
-      description: Ruta pública. Devuelve un access token JWT.
+      description: >
+        Ruta pública. Devuelve el par de tokens y los datos que la app y el panel
+        necesitan para la pantalla de inicio de cada rol (nombre, flota y si debe
+        cambiar la contraseña inicial).
       security: []
       requestBody:
         required: true
@@ -76,7 +108,7 @@ paths:
             schema:
               $ref: '#/components/schemas/LoginRequest'
             example:
-              email: "despachador@tire.com"
+              email: "laura.gomez@tandinos.co"
               password: "Password123"
       responses:
         '200':
@@ -88,12 +120,50 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: Credenciales inválidas o cuenta desactivada ("Correo o contraseña incorrectos").
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /auth/renovar:
+    post:
+      tags: [Autenticación]
+      summary: Renovar la sesión con el refresh token
+      description: >
+        Ruta pública. Cuando el access token vence durante un viaje, la app lo
+        renueva sin pedir nada al conductor y reenvía los datos pendientes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenovarSesionRequest'
+      responses:
+        '200':
+          description: Nuevo par de tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Refresh token inválido, vencido o revocado. La app vuelve al inicio de sesión.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /auth/contrasena:
     put:
       tags: [Autenticación]
-      summary: Cambiar contraseña del usuario autenticado
+      summary: Cambiar la contraseña del usuario autenticado
+      description: >
+        Disponible aunque `debeCambiarPassword` sea true; tras el cambio pasa a
+        false. Reglas de la nueva contraseña: mínimo 8 caracteres y distinta de
+        la actual.
       requestBody:
         required: true
         content:
@@ -101,8 +171,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CambioPasswordRequest'
             example:
-              passwordActual: "Password123"
-              passwordNueva: "NuevaPassword456"
+              passwordActual: "Rodriguez0119"
+              passwordNueva: "MiClaveSegura26"
       responses:
         '200':
           description: Contraseña actualizada.
@@ -114,8 +184,11 @@ paths:
   /auth/recuperacion:
     post:
       tags: [Autenticación]
-      summary: Solicitar recuperación de contraseña (HU-04)
-      description: Ruta pública. Procesa y simula el envío de instrucciones de restablecimiento.
+      summary: Solicitar el enlace de recuperación
+      description: >
+        Ruta pública. Si el correo existe, envía un enlace con un token de un
+        solo uso válido por 1 hora. La respuesta es la misma exista o no el
+        correo, para no revelar qué cuentas existen.
       security: []
       requestBody:
         required: true
@@ -124,23 +197,64 @@ paths:
             schema:
               $ref: '#/components/schemas/RecuperacionPasswordRequest'
             example:
-              email: "conductor@tire.com"
+              email: "carlos@correo.com"
       responses:
         '200':
-          description: Solicitud de recuperación procesada exitosamente.
+          description: Solicitud procesada.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MensajeResponse'
               example:
-                mensaje: "Si el correo está registrado, se enviaron las instrucciones de recuperación."
+                mensaje: "Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña."
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /auth/recuperacion/confirmar:
+    post:
+      tags: [Autenticación]
+      summary: Definir la nueva contraseña con el token del enlace
+      description: Ruta pública. Usa el token que llega en el enlace del correo.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmarRecuperacionRequest'
+      responses:
+        '200':
+          description: Contraseña cambiada. La app o el panel llevan al inicio de sesión.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '410':
+          description: El enlace venció o ya se usó ("El enlace venció. Solicita uno nuevo"). La contraseña no cambia.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://tire.unal.com/problems/token-expired"
+                title: "Enlace vencido"
+                status: 410
+                detail: "El enlace venció. Solicita uno nuevo."
+                instance: "/auth/recuperacion/confirmar"
 
   /conductores:
     post:
       tags: [Conductores]
-      summary: Crear conductor (DESPACHADOR)
+      summary: Registrar un conductor de la flota
+      description: >
+        Crea el conductor en la flota del despachador (tomada del token) y su
+        usuario con rol CONDUCTOR. El `id` del conductor es el mismo `usuarioId`
+        con el que inicia sesión y el `conductorId` de sus viajes. La contraseña
+        inicial es el primer apellido + los últimos 4 dígitos del documento
+        (por ejemplo, `Quintero8392`) y el usuario queda con
+        `debeCambiarPassword=true`.
       requestBody:
         required: true
         content:
@@ -148,11 +262,13 @@ paths:
             schema:
               $ref: '#/components/schemas/ConductorRequest'
             example:
-              nombre: "Pedro Conductor"
-              documento: "CC-1024"
-              correo: "pedro@tire.com"
-              telefono: "3001234567"
-              flotaId: "11111111-1111-1111-1111-111111111111"
+              nombres: "Hernán David"
+              apellidos: "Quintero Salas"
+              tipoDocumento: "CC"
+              numeroDocumento: "1015448392"
+              correo: "hquintero@tandinos.co"
+              telefono: "3155550129"
+              placaVehiculo: "KTM-640"
       responses:
         '201':
           description: Conductor creado.
@@ -167,19 +283,36 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: Ya existe un conductor con ese documento o ese correo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
     get:
       tags: [Conductores]
-      summary: Listar conductores (DESPACHADOR)
+      summary: Listar los conductores de la flota
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Busca por nombre, documento, correo o placa.
+          schema:
+            type: string
+        - name: activo
+          in: query
+          required: false
+          description: true = activos, false = desactivados, sin valor = todos.
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
       responses:
         '200':
-          description: Lista de conductores.
+          description: Página de conductores, ordenados por nombre.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ConductorResponse'
+                $ref: '#/components/schemas/PaginaConductores'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -190,7 +323,7 @@ paths:
       - $ref: '#/components/parameters/IdPath'
     get:
       tags: [Conductores]
-      summary: Obtener conductor por ID (DESPACHADOR)
+      summary: Obtener un conductor de la flota
       responses:
         '200':
           description: Conductor encontrado.
@@ -206,7 +339,10 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       tags: [Conductores]
-      summary: Actualizar conductor (DESPACHADOR)
+      summary: Editar o reactivar un conductor
+      description: >
+        Solo cambia los campos enviados. `activo=true` reactiva a un conductor
+        desactivado; `activo=false` sigue la misma regla que `DELETE`.
       requestBody:
         required: true
         content:
@@ -214,9 +350,9 @@ paths:
             schema:
               $ref: '#/components/schemas/ActualizarConductorRequest'
             example:
-              nombre: "Pedro Pérez"
-              telefono: "3009998888"
-              activo: true
+              correo: "jramirez@tandinos.co"
+              telefono: "3105550187"
+              placaVehiculo: "WMR-215"
       responses:
         '200':
           description: Conductor actualizado.
@@ -232,12 +368,21 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Documento o correo duplicado, o se intentó desactivar a un conductor con viaje en curso.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
     delete:
       tags: [Conductores]
-      summary: Desactivar conductor (DESPACHADOR, borrado lógico)
+      summary: Desactivar un conductor
+      description: >
+        El conductor queda con `activo=false`: no puede iniciar sesión ni
+        iniciar viajes. Sus viajes e incidentes se conservan.
       responses:
         '200':
-          description: Conductor desactivado (activo=false).
+          description: Conductor desactivado.
           content:
             application/json:
               schema:
@@ -248,11 +393,26 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: El conductor tiene un viaje en curso ("Este conductor tiene un viaje en curso").
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://tire.unal.com/problems/conflict"
+                title: "Conflicto de estado"
+                status: 409
+                detail: "Este conductor tiene un viaje en curso"
+                instance: "/conductores/7d1f0c2a-3b4e-4f5a-8c6d-9e0f1a2b3c4d"
 
   /viajes:
     post:
       tags: [Viajes]
-      summary: Iniciar viaje (CONDUCTOR)
+      summary: Iniciar un viaje
+      description: >
+        Crea el viaje en estado EN_CURSO y nivel NORMAL con la hora y la
+        ubicación de inicio. Origen y destino son opcionales.
       requestBody:
         required: true
         content:
@@ -260,8 +420,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ViajeRequest'
             example:
-              origen: "Bogotá"
-              destino: "Medellín"
               latitudInicial: 4.711
               longitudInicial: -74.0721
       responses:
@@ -278,30 +436,76 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >
+            El conductor ya tiene un viaje en curso. Incluye `viajeId` para que
+            la app ofrezca volver a ese viaje.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemViajeActivo'
+              example:
+                type: "https://tire.unal.com/problems/conflict"
+                title: "Conflicto de estado"
+                status: 409
+                detail: "El conductor ya tiene un viaje activo en curso"
+                instance: "/viajes"
+                viajeId: "5b3e2f10-8c1d-4a2b-9e7f-1c2d3e4f5a6b"
     get:
       tags: [Viajes]
-      summary: Listar viajes (CONDUCTOR o DESPACHADOR)
+      summary: Listar viajes
+      description: >
+        CONDUCTOR: solo sus viajes ("Mis viajes"). DESPACHADOR: los viajes de su
+        flota. Ordenados del más reciente al más antiguo. No incluye la lista de
+        eventos; para eso se usa `GET /viajes/{id}`.
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoViaje'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
       responses:
         '200':
-          description: Lista de viajes.
+          description: Página de viajes con su resumen.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ViajeResponse'
+                $ref: '#/components/schemas/PaginaViajes'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /viajes/activo:
+    get:
+      tags: [Viajes]
+      summary: Obtener el viaje en curso del conductor
+      description: Permite a la app retomar el monitoreo si se cerró o recibió un 409 al iniciar.
+      responses:
+        '200':
+          description: Viaje en curso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViajeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El conductor no tiene un viaje en curso.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /viajes/{id}:
     parameters:
       - $ref: '#/components/parameters/IdPath'
     get:
       tags: [Viajes]
-      summary: Obtener viaje por ID (CONDUCTOR o DESPACHADOR)
+      summary: Obtener un viaje con sus eventos
       responses:
         '200':
           description: Viaje encontrado.
@@ -315,28 +519,17 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-    delete:
-      tags: [Viajes]
-      summary: Cancelar viaje (CONDUCTOR o DESPACHADOR)
-      description: Solo permite cancelar viajes en curso y sin eventos de fatiga.
-      responses:
-        '204':
-          description: Viaje cancelado.
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
 
   /viajes/{id}/finalizar:
     parameters:
       - $ref: '#/components/parameters/IdPath'
     patch:
       tags: [Viajes]
-      summary: Finalizar viaje (CONDUCTOR)
+      summary: Finalizar el viaje
+      description: >
+        El viaje queda FINALIZADO y la respuesta trae el `resumen` (duración y
+        número de alertas). Si la app no recibe respuesta, el viaje sigue activo
+        hasta que el servidor lo confirme.
       responses:
         '200':
           description: Viaje finalizado.
@@ -358,8 +551,13 @@ paths:
       - $ref: '#/components/parameters/IdPath'
     post:
       tags: [Viajes]
-      summary: Registrar telemetría (CONDUCTOR)
-      description: Enriquece el viaje con el clima actual consultado a Open-Meteo.
+      summary: Enviar ubicación y velocidad
+      description: >
+        La app lo envía cada 10 segundos. Actualiza `ultimaSenalEn`, que el panel
+        usa para marcar "Sin señal" tras 2 minutos sin reportes. El nivel de
+        alerta no se envía: lo calcula el backend (ver `NivelAlerta`). El clima
+        se consulta a Open-Meteo como máximo cada 15 minutos; si el servicio no
+        responde, `ultimoClima` llega `null` y la app muestra "Clima no disponible".
       requestBody:
         required: true
         content:
@@ -369,6 +567,7 @@ paths:
             example:
               latitud: 5.5353
               longitud: -73.3678
+              velocidadKmh: 72.5
       responses:
         '200':
           description: Telemetría registrada.
@@ -392,24 +591,53 @@ paths:
       - $ref: '#/components/parameters/IdPath'
     post:
       tags: [Viajes]
-      summary: Registrar evento de fatiga (CONDUCTOR)
+      summary: Registrar un evento de fatiga
       description: >
-        Registra un microsueño. Si el nivel de alerta escala a CRITICO se abre
-        automáticamente una alerta para el despachador.
+        **MICROSUENO:** la app lo envía al cerrarse la ventana de 5 segundos de
+        la alarma. Si el conductor tocó "Estoy bien", va con `respondio=true` y
+        `tiempoRespuestaSegundos`. Si no, con `respondio=false`: el viaje pasa a
+        CRITICO y se abre una alerta para el despachador (solo conductores de
+        flota). Ver las reglas en `NivelAlerta`.
+
+
+        **ROSTRO_NO_VISIBLE:** la app lo envía cuando el rostro vuelve a la
+        cámara tras más de 5 segundos sin verse, con `duracionSegundos`. Queda
+        en el historial y en el resumen, pero no cambia el nivel de alerta.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/EventoFatigaRequest'
-            example:
-              latitud: 5.5353
-              longitud: -73.3678
-              duracionOjosCerradosSegundos: 2.0
-              confirmadoPorConductor: false
+            examples:
+              microsuenoSinRespuesta:
+                summary: Microsueño sin respuesta (escala a CRITICO)
+                value:
+                  tipoEvento: "MICROSUENO"
+                  fechaHoraDeteccion: "2026-11-06T22:41:52"
+                  duracionSegundos: 2.3
+                  respondio: false
+                  latitud: 5.1462
+                  longitud: -73.6851
+              microsuenoConfirmado:
+                summary: Microsueño confirmado con "Estoy bien"
+                value:
+                  tipoEvento: "MICROSUENO"
+                  fechaHoraDeteccion: "2026-11-06T22:12:04"
+                  duracionSegundos: 1.8
+                  respondio: true
+                  tiempoRespuestaSegundos: 3
+                  latitud: 4.4389
+                  longitud: -75.2322
+              rostroNoVisible:
+                summary: Rostro no visible durante 9 segundos
+                value:
+                  tipoEvento: "ROSTRO_NO_VISIBLE"
+                  fechaHoraDeteccion: "2026-11-06T21:47:10"
+                  duracionSegundos: 9
       responses:
         '201':
-          description: Evento registrado.
+          description: Evento registrado; devuelve el viaje con el nivel recalculado.
           content:
             application/json:
               schema:
@@ -430,7 +658,19 @@ paths:
       - $ref: '#/components/parameters/IdPath'
     patch:
       tags: [Viajes]
-      summary: Confirmar alerta por el conductor (CONDUCTOR)
+      summary: Confirmar "Estoy bien" después de una escalada
+      description: >
+        Se usa cuando el conductor toca "Estoy bien" después de que el viaje ya
+        pasó a CRITICO (alarma intensificada). El nivel baja a PRECAUCION. La
+        alerta del panel sigue abierta hasta que el despachador la atienda.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmarAlertaRequest'
+            example:
+              tiempoRespuestaSegundos: 14
       responses:
         '200':
           description: Alerta confirmada; nivel recalculado.
@@ -438,6 +678,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ViajeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -450,10 +692,15 @@ paths:
   /flota/estado:
     get:
       tags: [Flota y Alertas]
-      summary: Estado de la flota (DESPACHADOR)
+      summary: Estado de la flota
+      description: >
+        Todos los conductores activos de la flota: arriba los que están en viaje
+        con su estado y debajo los que están "Sin viaje" con la fecha de su
+        último viaje. Si nadie está en viaje, `conductoresEnViaje` llega vacío y
+        el panel muestra "No hay conductores en ruta".
       responses:
         '200':
-          description: Resumen de viajes activos por nivel de alerta.
+          description: Estado actual de la flota.
           content:
             application/json:
               schema:
@@ -466,10 +713,11 @@ paths:
   /alertas:
     get:
       tags: [Flota y Alertas]
-      summary: Listar alertas abiertas (DESPACHADOR)
+      summary: Alertas críticas sin atender de la flota
+      description: Ordenadas de la más reciente a la más antigua.
       responses:
         '200':
-          description: Alertas críticas sin atender.
+          description: Alertas abiertas.
           content:
             application/json:
               schema:
@@ -481,20 +729,41 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /alertas/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [Flota y Alertas]
+      summary: Detalle de una alerta, abierta o atendida
+      responses:
+        '200':
+          description: Alerta con su línea de tiempo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaDetalleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /alertas/{id}/atender:
     parameters:
       - $ref: '#/components/parameters/IdPath'
     patch:
       tags: [Flota y Alertas]
-      summary: Atender una alerta crítica (DESPACHADOR)
+      summary: Marcar una alerta como atendida
+      description: Registra quién la atendió y a qué hora. La nota es opcional.
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AtenderAlertaRequest'
             example:
-              notas: "Contacté al conductor; se detendrá en el próximo paradero."
+              notas: "Llamé al conductor. Se detuvo en la estación de servicio de Gachancipá."
       responses:
         '200':
           description: Alerta atendida.
@@ -511,12 +780,21 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: La alerta ya fue atendida.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
-  /incidentes:
+  /eventos:
     get:
       tags: [Flota y Alertas]
-      summary: Listar incidentes atendidos (DESPACHADOR)
+      summary: Historial de incidentes del turno
+      description: >
+        Todos los eventos de fatiga de la flota en el rango, del más reciente al
+        más antiguo, con conductor, ubicación, tipo de evento y si fue
+        confirmado. El "turno actual" lo arma el panel como valor por defecto de
+        `fechaInicio`. Reemplaza a `GET /incidentes`.
       parameters:
         - name: fechaInicio
           in: query
@@ -524,25 +802,46 @@ paths:
           schema:
             type: string
             format: date-time
-          description: Fecha y hora inicial del filtro (ISO-8601).
-          example: "2026-11-01T00:00:00"
+          example: "2026-11-06T18:00:00"
         - name: fechaFin
           in: query
           required: false
           schema:
             type: string
             format: date-time
-          description: Fecha y hora final del filtro (ISO-8601).
-          example: "2026-11-30T23:59:59"
+          example: "2026-11-07T06:00:00"
+        - name: tipoEvento
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TipoEvento'
+        - name: conductorId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
       responses:
         '200':
-          description: Alertas críticas ya atendidas.
+          description: Página de eventos.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AlertaResponse'
+                $ref: '#/components/schemas/PaginaEventos'
+        '400':
+          description: Rango inválido (`fechaFin` anterior a `fechaInicio`) u otro parámetro mal formado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://tire.unal.com/problems/validation-error"
+                title: "Error de validacion"
+                status: 400
+                detail: "La fecha final no puede ser anterior a la inicial."
+                instance: "/eventos"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -554,7 +853,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Token JWT emitido por POST /auth/sesion.
+      description: Access token emitido por POST /auth/sesion o POST /auth/renovar.
 
   parameters:
     IdPath:
@@ -565,10 +864,29 @@ components:
       schema:
         type: string
         format: uuid
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página, empezando en 0.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Elementos por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 8
 
   responses:
     BadRequest:
-      description: Solicitud inválida (RFC 9457).
+      description: Solicitud inválida (RFC 9457). `errors` indica cada campo con error.
       content:
         application/problem+json:
           schema:
@@ -583,7 +901,7 @@ components:
               - field: "correo"
                 message: "El correo es obligatorio"
     Unauthorized:
-      description: No autenticado (RFC 9457).
+      description: No autenticado o token vencido (RFC 9457). La app intenta `POST /auth/renovar`.
       content:
         application/problem+json:
           schema:
@@ -595,19 +913,33 @@ components:
             detail: "Se requiere un token de acceso valido para acceder a este recurso."
             instance: "/conductores"
     Forbidden:
-      description: Acceso denegado por rol (RFC 9457).
+      description: >
+        Acceso denegado (RFC 9457). Dos casos, distinguibles por `type`:
+        rol incorrecto (`.../problems/forbidden`; el panel muestra "Esta sección
+        es solo para despachadores") o contraseña inicial sin cambiar
+        (`.../problems/password-change-required`; la app abre la pantalla de
+        cambio de contraseña).
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
-          example:
-            type: "https://tire.unal.com/problems/forbidden"
-            title: "Acceso denegado"
-            status: 403
-            detail: "No tiene permisos para acceder a este recurso."
-            instance: "/conductores"
+          examples:
+            rol:
+              value:
+                type: "https://tire.unal.com/problems/forbidden"
+                title: "Acceso denegado"
+                status: 403
+                detail: "Esta sección es solo para despachadores."
+                instance: "/conductores"
+            cambioContrasena:
+              value:
+                type: "https://tire.unal.com/problems/password-change-required"
+                title: "Cambio de contraseña requerido"
+                status: 403
+                detail: "Debes cambiar tu contraseña inicial antes de continuar."
+                instance: "/viajes"
     NotFound:
-      description: Recurso no encontrado (RFC 9457).
+      description: Recurso no encontrado o fuera del alcance del usuario (RFC 9457).
       content:
         application/problem+json:
           schema:
@@ -619,7 +951,7 @@ components:
             detail: "Conductor no encontrado"
             instance: "/conductores/00000000-0000-0000-0000-000000000000"
     Conflict:
-      description: Conflicto de estado (RFC 9457).
+      description: Conflicto de estado (RFC 9457), por ejemplo un viaje que ya no está en curso.
       content:
         application/problem+json:
           schema:
@@ -628,24 +960,53 @@ components:
             type: "https://tire.unal.com/problems/conflict"
             title: "Conflicto de estado"
             status: 409
-            detail: "El conductor ya tiene un viaje activo en curso"
-            instance: "/viajes"
+            detail: "El viaje no está en curso."
+            instance: "/viajes/5b3e2f10-8c1d-4a2b-9e7f-1c2d3e4f5a6b/eventos"
 
   schemas:
     RolUsuario:
       type: string
       enum: [CONDUCTOR, DESPACHADOR]
+      description: CONDUCTOR incluye al conductor particular (sin flota).
 
     EstadoViaje:
       type: string
-      enum: [EN_CURSO, FINALIZADO, CANCELADO]
+      enum: [EN_CURSO, FINALIZADO]
 
     NivelAlerta:
       type: string
       enum: [NORMAL, PRECAUCION, CRITICO]
+      description: >
+        Lo calcula el backend según HU-17. Todo viaje empieza en NORMAL.
+        NORMAL + microsueño confirmado → PRECAUCION.
+        PRECAUCION sin microsueños durante 15 minutos → NORMAL.
+        NORMAL o PRECAUCION + microsueño sin confirmar en 5 s → CRITICO.
+        PRECAUCION + otro microsueño antes de 15 minutos → CRITICO.
+        CRITICO + "Estoy bien" (`/confirmar-alerta`) → PRECAUCION.
+        Cada paso a CRITICO abre una sola alerta (solo conductores de flota),
+        que sigue abierta hasta que el despachador la atiende.
+
+    EstadoMonitoreo:
+      type: string
+      enum: [NORMAL, PRECAUCION, CRITICO, SIN_SENAL, SIN_VIAJE]
+      description: >
+        Estado que muestra el panel por conductor (HU-23). Los tres primeros son
+        el `NivelAlerta` del viaje. SIN_SENAL: en viaje pero sin telemetría hace
+        más de 2 minutos. SIN_VIAJE: conductor activo sin viaje en curso.
+
+    TipoEvento:
+      type: string
+      enum: [MICROSUENO, ROSTRO_NO_VISIBLE]
+
+    TipoDocumento:
+      type: string
+      enum: [CC, CE, PASAPORTE]
+      description: CC = cédula de ciudadanía, CE = cédula de extranjería.
 
     CondicionClimatica:
       type: object
+      nullable: true
+      description: Clima actual de la ubicación (Open-Meteo). `null` si no está disponible (HU-26).
       properties:
         temperaturaCelsius:
           type: number
@@ -657,30 +1018,29 @@ components:
           example: 12.0
         descripcion:
           type: string
+          enum: [DESPEJADO, PARCIALMENTE_NUBLADO, NIEBLA, LLOVIZNA, LLUVIA, NIEVE, CHUBASCOS, TORMENTA, DESCONOCIDO]
           example: "LLUVIA"
+        consultadoEn:
+          type: string
+          format: date-time
 
     RegistroRequest:
       type: object
-      required: [nombre, email, password, rol]
+      required: [nombre, email, password, aceptaTratamientoDatos]
       properties:
         nombre:
           type: string
-          example: "María Despachadora"
+          example: "Carlos Rodríguez"
         email:
           type: string
           format: email
-          example: "despachador@tire.com"
         password:
           type: string
           format: password
           minLength: 8
-          example: "Password123"
-        rol:
-          $ref: '#/components/schemas/RolUsuario'
-        flotaId:
-          type: string
-          format: uuid
-          nullable: true
+        aceptaTratamientoDatos:
+          type: boolean
+          description: Debe ser true. Autorización de tratamiento de datos (el rostro se analiza solo en el teléfono).
 
     LoginRequest:
       type: object
@@ -689,11 +1049,16 @@ components:
         email:
           type: string
           format: email
-          example: "despachador@tire.com"
         password:
           type: string
           format: password
-          example: "Password123"
+
+    RenovarSesionRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
 
     CambioPasswordRequest:
       type: object
@@ -702,12 +1067,11 @@ components:
         passwordActual:
           type: string
           format: password
-          example: "Password123"
         passwordNueva:
           type: string
           format: password
           minLength: 8
-          example: "NuevaPassword456"
+          description: Mínimo 8 caracteres y distinta de `passwordActual`.
 
     RecuperacionPasswordRequest:
       type: object
@@ -716,18 +1080,28 @@ components:
         email:
           type: string
           format: email
-          example: "conductor@tire.com"
+
+    ConfirmarRecuperacionRequest:
+      type: object
+      required: [token, passwordNueva]
+      properties:
+        token:
+          type: string
+          description: Token de un solo uso recibido en el enlace del correo (vigencia 1 hora).
+        passwordNueva:
+          type: string
+          format: password
+          minLength: 8
 
     MensajeResponse:
       type: object
       properties:
         mensaje:
           type: string
-          example: "Si el correo está registrado, se enviaron las instrucciones de recuperación."
 
-    AuthResponse:
+    UsuarioResponse:
       type: object
-      description: Usuario recién registrado (sin hash de contraseña).
+      description: Usuario creado (sin hash de contraseña).
       properties:
         id:
           type: string
@@ -752,6 +1126,8 @@ components:
         accessToken:
           type: string
           example: "eyJhbGciOiJIUzI1NiJ9..."
+        refreshToken:
+          type: string
         tipo:
           type: string
           example: "Bearer"
@@ -766,42 +1142,70 @@ components:
           format: uuid
         nombre:
           type: string
-
-    ConductorRequest:
-      type: object
-      required: [nombre, documento, correo]
-      properties:
-        nombre:
-          type: string
-          example: "Pedro Conductor"
-        documento:
-          type: string
-          example: "CC-1024"
-        correo:
-          type: string
-          format: email
-          example: "pedro@tire.com"
-        telefono:
-          type: string
-          nullable: true
-          example: "3001234567"
+          example: "Laura Gómez"
         flotaId:
           type: string
           format: uuid
           nullable: true
+          description: null para el conductor particular.
+        nombreFlota:
+          type: string
+          nullable: true
+          example: "Transportes Andinos S.A.S."
+        debeCambiarPassword:
+          type: boolean
+          description: true si el conductor aún usa la contraseña inicial (HU-03).
+
+    ConductorRequest:
+      type: object
+      required: [nombres, apellidos, tipoDocumento, numeroDocumento, correo]
+      description: La flota se toma del token del despachador.
+      properties:
+        nombres:
+          type: string
+        apellidos:
+          type: string
+          description: El primer apellido se usa para la contraseña inicial.
+        tipoDocumento:
+          $ref: '#/components/schemas/TipoDocumento'
+        numeroDocumento:
+          type: string
+          pattern: '^[A-Za-z0-9]{4,20}$'
+        correo:
+          type: string
+          format: email
+        telefono:
+          type: string
+          nullable: true
+        placaVehiculo:
+          type: string
+          nullable: true
+          example: "KTM-640"
 
     ActualizarConductorRequest:
       type: object
+      description: Todos los campos son opcionales; solo cambian los enviados.
       properties:
-        nombre:
+        nombres:
+          type: string
+        apellidos:
+          type: string
+        tipoDocumento:
+          $ref: '#/components/schemas/TipoDocumento'
+        numeroDocumento:
+          type: string
+          pattern: '^[A-Za-z0-9]{4,20}$'
+        correo:
+          type: string
+          format: email
+        telefono:
           type: string
           nullable: true
-        telefono:
+        placaVehiculo:
           type: string
           nullable: true
         activo:
           type: boolean
-          nullable: true
 
     ConductorResponse:
       type: object
@@ -809,9 +1213,16 @@ components:
         id:
           type: string
           format: uuid
-        nombre:
+          description: Igual al `usuarioId` del conductor y al `conductorId` de sus viajes.
+        nombres:
           type: string
-        documento:
+        apellidos:
+          type: string
+        nombreCompleto:
+          type: string
+        tipoDocumento:
+          $ref: '#/components/schemas/TipoDocumento'
+        numeroDocumento:
           type: string
         correo:
           type: string
@@ -819,40 +1230,93 @@ components:
         telefono:
           type: string
           nullable: true
+        placaVehiculo:
+          type: string
+          nullable: true
         flotaId:
           type: string
           format: uuid
-          nullable: true
         activo:
+          type: boolean
+        tieneViajeEnCurso:
           type: boolean
         creadoEn:
           type: string
           format: date-time
 
+    ConductorResumen:
+      type: object
+      description: Datos del conductor que el panel muestra en flota, alertas e historial.
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombreCompleto:
+          type: string
+          example: "Jorge Ramírez"
+        placaVehiculo:
+          type: string
+          nullable: true
+          example: "WMR-215"
+        telefono:
+          type: string
+          nullable: true
+          example: "3105550187"
+
+    UsuarioResumen:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Laura Gómez"
+
+    Pagina:
+      type: object
+      properties:
+        pagina:
+          type: integer
+        tamano:
+          type: integer
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+
+    PaginaConductores:
+      allOf:
+        - $ref: '#/components/schemas/Pagina'
+        - type: object
+          properties:
+            contenido:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConductorResponse'
+
     ViajeRequest:
       type: object
-      required: [origen, destino]
       properties:
-        origen:
-          type: string
-          example: "Bogotá"
-        destino:
-          type: string
-          example: "Medellín"
         latitudInicial:
           type: number
           format: double
           minimum: -90
           maximum: 90
           nullable: true
-          example: 4.711
         longitudInicial:
           type: number
           format: double
           minimum: -180
           maximum: 180
           nullable: true
-          example: -74.0721
+        origen:
+          type: string
+          nullable: true
+        destino:
+          type: string
+          nullable: true
 
     TelemetriaRequest:
       type: object
@@ -863,39 +1327,80 @@ components:
           format: double
           minimum: -90
           maximum: 90
-          example: 5.5353
         longitud:
           type: number
           format: double
           minimum: -180
           maximum: 180
-          example: -73.3678
+        velocidadKmh:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
 
     EventoFatigaRequest:
       type: object
-      required: [duracionOjosCerradosSegundos]
+      required: [tipoEvento, fechaHoraDeteccion, duracionSegundos]
       properties:
+        tipoEvento:
+          $ref: '#/components/schemas/TipoEvento'
+        fechaHoraDeteccion:
+          type: string
+          format: date-time
+          description: Hora en que la app detectó el evento (no la de envío).
+        duracionSegundos:
+          type: number
+          format: double
+          description: >
+            MICROSUENO: segundos con los ojos cerrados (mínimo 1,5).
+            ROSTRO_NO_VISIBLE: segundos sin ver el rostro (mínimo 5).
+          example: 2.3
+        respondio:
+          type: boolean
+          nullable: true
+          description: Solo MICROSUENO (obligatorio). true si tocó "Estoy bien" dentro de los 5 segundos.
+        tiempoRespuestaSegundos:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+          nullable: true
+          description: Solo MICROSUENO con `respondio=true`.
         latitud:
           type: number
           format: double
           minimum: -90
           maximum: 90
           nullable: true
-          example: 5.5353
         longitud:
           type: number
           format: double
           minimum: -180
           maximum: 180
           nullable: true
-          example: -73.3678
-        duracionOjosCerradosSegundos:
+
+    ConfirmarAlertaRequest:
+      type: object
+      required: [tiempoRespuestaSegundos]
+      properties:
+        tiempoRespuestaSegundos:
           type: number
           format: double
-          example: 2.0
-        confirmadoPorConductor:
-          type: boolean
-          example: false
+          minimum: 0
+          description: Segundos desde que se detectó el microsueño hasta que tocó "Estoy bien".
+
+    RespuestaConductor:
+      type: object
+      description: Lo que hizo el conductor ante el evento (columna "Respuesta del conductor").
+      properties:
+        tipo:
+          type: string
+          enum: [RESPONDIO, NO_RESPONDIO, VOLVIO_A_CAMARA]
+        segundos:
+          type: number
+          format: double
+          nullable: true
+          description: Tiempo de respuesta, o tiempo hasta volver a la cámara.
 
     EventoFatigaResponse:
       type: object
@@ -906,9 +1411,19 @@ components:
         viajeId:
           type: string
           format: uuid
+        tipoEvento:
+          $ref: '#/components/schemas/TipoEvento'
         fechaHora:
           type: string
           format: date-time
+        duracionSegundos:
+          type: number
+          format: double
+        respuesta:
+          $ref: '#/components/schemas/RespuestaConductor'
+        confirmado:
+          type: boolean
+          description: true si el conductor confirmó con "Estoy bien" (en los 5 s o después).
         latitud:
           type: number
           format: double
@@ -917,13 +1432,28 @@ components:
           type: number
           format: double
           nullable: true
-        duracionOjosCerradosSegundos:
-          type: number
-          format: double
-        confirmadoPorConductor:
-          type: boolean
-        climaEnRuta:
-          $ref: '#/components/schemas/CondicionClimatica'
+        alertaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Alerta crítica que abrió este evento, si la hubo.
+
+    ResumenViaje:
+      type: object
+      description: Datos para el resumen al finalizar (HU-10) y para "Mis viajes" (HU-25).
+      properties:
+        duracionMinutos:
+          type: integer
+          example: 86
+        microsuenos:
+          type: integer
+          example: 1
+        rostroNoVisible:
+          type: integer
+          example: 2
+        alertasCriticas:
+          type: integer
+          example: 0
 
     ViajeResponse:
       type: object
@@ -936,8 +1466,10 @@ components:
           format: uuid
         origen:
           type: string
+          nullable: true
         destino:
           type: string
+          nullable: true
         estado:
           $ref: '#/components/schemas/EstadoViaje'
         nivelAlerta:
@@ -957,21 +1489,117 @@ components:
           type: number
           format: double
           nullable: true
+        ultimaSenalEn:
+          type: string
+          format: date-time
+          nullable: true
+        velocidadKmh:
+          type: number
+          format: double
+          nullable: true
         ultimoClima:
           $ref: '#/components/schemas/CondicionClimatica'
-        eventosFatiga:
+        resumen:
+          $ref: '#/components/schemas/ResumenViaje'
+        eventos:
           type: array
+          description: Solo en `GET /viajes/{id}` y en las respuestas de escritura; no en el listado.
           items:
             $ref: '#/components/schemas/EventoFatigaResponse'
 
+    PaginaViajes:
+      allOf:
+        - $ref: '#/components/schemas/Pagina'
+        - type: object
+          properties:
+            contenido:
+              type: array
+              items:
+                $ref: '#/components/schemas/ViajeResponse'
+
+    ConductorEnViaje:
+      type: object
+      properties:
+        conductor:
+          $ref: '#/components/schemas/ConductorResumen'
+        viajeId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoMonitoreo'
+        nivelAlerta:
+          $ref: '#/components/schemas/NivelAlerta'
+        fechaInicio:
+          type: string
+          format: date-time
+          description: Para calcular "Tiempo en viaje".
+        ultimaSenalEn:
+          type: string
+          format: date-time
+          nullable: true
+        ultimaLatitud:
+          type: number
+          format: double
+          nullable: true
+        ultimaLongitud:
+          type: number
+          format: double
+          nullable: true
+        velocidadKmh:
+          type: number
+          format: double
+          nullable: true
+        alertaAbiertaId:
+          type: string
+          format: uuid
+          nullable: true
+
+    ConductorSinViaje:
+      type: object
+      properties:
+        conductor:
+          $ref: '#/components/schemas/ConductorResumen'
+        fechaUltimoViaje:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fin del último viaje; null si nunca ha viajado.
+
+    EstadoFlotaResponse:
+      type: object
+      properties:
+        actualizadoEn:
+          type: string
+          format: date-time
+        conteoPorEstado:
+          type: object
+          description: Conteo de conductores activos por `EstadoMonitoreo`.
+          additionalProperties:
+            type: integer
+          example:
+            NORMAL: 9
+            PRECAUCION: 2
+            CRITICO: 1
+            SIN_SENAL: 1
+            SIN_VIAJE: 11
+        conductoresEnViaje:
+          type: array
+          description: Ordenados por gravedad (CRITICO, SIN_SENAL, PRECAUCION, NORMAL).
+          items:
+            $ref: '#/components/schemas/ConductorEnViaje'
+        conductoresSinViaje:
+          type: array
+          description: Ordenados por `fechaUltimoViaje`, del más reciente al más antiguo.
+          items:
+            $ref: '#/components/schemas/ConductorSinViaje'
+
     AtenderAlertaRequest:
       type: object
-      required: [notas]
       properties:
         notas:
           type: string
           maxLength: 1000
-          example: "Contacté al conductor; se detendrá en el próximo paradero."
+          nullable: true
 
     AlertaResponse:
       type: object
@@ -982,53 +1610,100 @@ components:
         viajeId:
           type: string
           format: uuid
-        conductorId:
+        eventoId:
           type: string
           format: uuid
-          nullable: true
-        flotaId:
+        conductor:
+          $ref: '#/components/schemas/ConductorResumen'
+        tipoEvento:
+          $ref: '#/components/schemas/TipoEvento'
+        duracionSegundos:
+          type: number
+          format: double
+          description: Segundos con los ojos cerrados.
+        fechaEvento:
           type: string
-          format: uuid
-          nullable: true
+          format: date-time
+          description: Hora de detección del microsueño ("Hora del evento").
         fechaApertura:
           type: string
           format: date-time
-        fechaAtencion:
-          type: string
-          format: date-time
-          nullable: true
+          description: Hora en que se envió la alerta al panel.
         latitud:
           type: number
           format: double
           nullable: true
+          description: null → el panel muestra "Ubicación no disponible".
         longitud:
           type: number
           format: double
           nullable: true
         atendida:
           type: boolean
+        fechaAtencion:
+          type: string
+          format: date-time
+          nullable: true
+        atendidaPor:
+          allOf:
+            - $ref: '#/components/schemas/UsuarioResumen'
+          nullable: true
         notasDespachador:
           type: string
           nullable: true
 
-    EstadoFlotaResponse:
+    EntradaLineaTiempo:
       type: object
       properties:
-        totalViajesActivos:
-          type: integer
-          example: 3
-        conteoPorNivel:
-          type: object
-          additionalProperties:
-            type: integer
-          example:
-            NORMAL: 1
-            PRECAUCION: 1
-            CRITICO: 1
-        viajesActivos:
-          type: array
-          items:
-            $ref: '#/components/schemas/ViajeResponse'
+        fechaHora:
+          type: string
+          format: date-time
+        tipo:
+          type: string
+          enum: [DETECTADO, ALARMA_ACTIVADA, ALARMA_INTENSIFICADA, ALERTA_ENVIADA, CONDUCTOR_CONFIRMO, ATENDIDA]
+        descripcion:
+          type: string
+          example: "Sin respuesta en 5 s, alarma intensificada"
+
+    AlertaDetalleResponse:
+      allOf:
+        - $ref: '#/components/schemas/AlertaResponse'
+        - type: object
+          properties:
+            fechaInicioViaje:
+              type: string
+              format: date-time
+              description: Para calcular "Tiempo en viaje".
+            ultimaSenalEn:
+              type: string
+              format: date-time
+              nullable: true
+            lineaTiempo:
+              type: array
+              items:
+                $ref: '#/components/schemas/EntradaLineaTiempo'
+
+    EventoHistorial:
+      allOf:
+        - $ref: '#/components/schemas/EventoFatigaResponse'
+        - type: object
+          properties:
+            conductor:
+              $ref: '#/components/schemas/ConductorResumen'
+            atencion:
+              type: string
+              enum: [NO_REQUIERE, SIN_ATENDER, ATENDIDA]
+              description: Estado de la alerta asociada; NO_REQUIERE si el evento no abrió alerta.
+
+    PaginaEventos:
+      allOf:
+        - $ref: '#/components/schemas/Pagina'
+        - type: object
+          properties:
+            contenido:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventoHistorial'
 
     ProblemDetails:
       type: object
@@ -1037,20 +1712,15 @@ components:
         type:
           type: string
           format: uri
-          example: "https://tire.unal.com/problems/conflict"
         title:
           type: string
-          example: "Conflicto de estado"
         status:
           type: integer
-          example: 409
         detail:
           type: string
-          example: "El conductor ya tiene un viaje activo en curso"
         instance:
           type: string
           format: uri
-          example: "/viajes"
         timestamp:
           type: string
           format: date-time
@@ -1064,3 +1734,13 @@ components:
                 type: string
               message:
                 type: string
+
+    ProblemViajeActivo:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            viajeId:
+              type: string
+              format: uuid
+              description: Viaje en curso del conductor.
