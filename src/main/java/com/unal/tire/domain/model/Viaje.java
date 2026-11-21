@@ -5,6 +5,7 @@ import com.unal.tire.domain.exception.ReglaNegocioException;
 import com.unal.tire.domain.state.EstadoAlertaState;
 import com.unal.tire.domain.state.FabricaEstadoAlerta;
 import com.unal.tire.domain.valueobject.CondicionClimatica;
+import com.unal.tire.domain.valueobject.EstadoMonitoreo;
 import com.unal.tire.domain.valueobject.EstadoViaje;
 import com.unal.tire.domain.valueobject.NivelAlerta;
 import com.unal.tire.domain.valueobject.Ubicacion;
@@ -36,6 +37,8 @@ public class Viaje {
     private LocalDateTime fechaFin;
     private Ubicacion ultimaUbicacion;
     private CondicionClimatica ultimoClima;
+    private LocalDateTime ultimaSenalEn;
+    private Double velocidadKmh;
     private List<EventoFatiga> eventosFatiga;
 
     public Viaje() {
@@ -47,6 +50,7 @@ public class Viaje {
     public Viaje(UUID id, UUID conductorId, String origen, String destino, EstadoViaje estado,
                  NivelAlerta nivelAlerta, LocalDateTime fechaInicio, LocalDateTime fechaFin,
                  Ubicacion ultimaUbicacion, CondicionClimatica ultimoClima,
+                 LocalDateTime ultimaSenalEn, Double velocidadKmh,
                  List<EventoFatiga> eventosFatiga) {
         this.id = id;
         this.conductorId = conductorId;
@@ -58,6 +62,8 @@ public class Viaje {
         this.fechaFin = fechaFin;
         this.ultimaUbicacion = ultimaUbicacion;
         this.ultimoClima = ultimoClima;
+        this.ultimaSenalEn = ultimaSenalEn;
+        this.velocidadKmh = velocidadKmh;
         this.eventosFatiga = eventosFatiga != null ? new ArrayList<>(eventosFatiga) : new ArrayList<>();
     }
 
@@ -66,14 +72,19 @@ public class Viaje {
      *
      * @throws ConflictoEstadoException si el viaje no esta en curso.
      */
-    public void registrarTelemetria(Ubicacion ubicacion, CondicionClimatica clima) {
+    public void registrarTelemetria(Ubicacion ubicacion, Double velocidadKmh,
+                                    CondicionClimatica clima, LocalDateTime momento) {
         exigirEnCurso("Un viaje finalizado o cancelado no acepta nueva telemetría");
         if (ubicacion != null) {
             this.ultimaUbicacion = ubicacion;
         }
+        if (velocidadKmh != null) {
+            this.velocidadKmh = velocidadKmh;
+        }
         if (clima != null) {
             this.ultimoClima = clima;
         }
+        this.ultimaSenalEn = momento != null ? momento : LocalDateTime.now();
     }
 
     /**
@@ -90,11 +101,17 @@ public class Viaje {
 
         this.eventosFatiga.add(evento);
 
-        int microsuenosRecientes = this.eventosFatiga.size();
-        EstadoAlertaState estadoActual = FabricaEstadoAlerta.desdeNivel(this.nivelAlerta);
-        EstadoAlertaState nuevoEstado = estadoActual.registrarMicrosueno(
-                evento.isConfirmadoPorConductor(), microsuenosRecientes);
-        this.nivelAlerta = nuevoEstado.obtenerNivel();
+        // Solo los microsuenos recalculan el nivel de alerta (patron State).
+        // El evento de rostro no visible queda en el historial sin afectar el nivel.
+        if (evento.afectaNivelAlerta()) {
+            long microsuenosRecientes = this.eventosFatiga.stream()
+                    .filter(EventoFatiga::afectaNivelAlerta)
+                    .count();
+            EstadoAlertaState estadoActual = FabricaEstadoAlerta.desdeNivel(this.nivelAlerta);
+            EstadoAlertaState nuevoEstado = estadoActual.registrarMicrosueno(
+                    evento.fueConfirmado(), (int) microsuenosRecientes);
+            this.nivelAlerta = nuevoEstado.obtenerNivel();
+        }
 
         if (evento.getUbicacion() != null) {
             this.ultimaUbicacion = evento.getUbicacion();
@@ -144,6 +161,29 @@ public class Viaje {
                     "No se puede cancelar un viaje que ya tiene eventos de fatiga registrados o que ya terminó");
         }
         this.estado = EstadoViaje.CANCELADO;
+    }
+
+    /** Minutos sin telemetria tras los cuales el panel marca "Sin señal". */
+    public static final long UMBRAL_SIN_SENAL_MINUTOS = 2;
+
+    /**
+     * Calcula el estado que el panel del despachador debe mostrar para este
+     * viaje en curso (HU-23). Si el viaje no esta en curso devuelve el nivel
+     * de alerta tal cual.
+     *
+     * @param ahora          instante de referencia.
+     * @param ultimaSenalEn  fecha del ultimo reporte de telemetria (o inicio).
+     */
+    public EstadoMonitoreo calcularEstadoMonitoreo(LocalDateTime ahora, LocalDateTime ultimaSenalEn) {
+        if (estado == EstadoViaje.EN_CURSO && ultimaSenalEn != null
+                && ultimaSenalEn.isBefore(ahora.minusMinutes(UMBRAL_SIN_SENAL_MINUTOS))) {
+            return EstadoMonitoreo.SIN_SENAL;
+        }
+        return switch (nivelAlerta) {
+            case NORMAL -> EstadoMonitoreo.NORMAL;
+            case PRECAUCION -> EstadoMonitoreo.PRECAUCION;
+            case CRITICO -> EstadoMonitoreo.CRITICO;
+        };
     }
 
     private void exigirEnCurso(String mensaje) {
@@ -230,6 +270,22 @@ public class Viaje {
 
     public void setUltimoClima(CondicionClimatica ultimoClima) {
         this.ultimoClima = ultimoClima;
+    }
+
+    public LocalDateTime getUltimaSenalEn() {
+        return ultimaSenalEn;
+    }
+
+    public void setUltimaSenalEn(LocalDateTime ultimaSenalEn) {
+        this.ultimaSenalEn = ultimaSenalEn;
+    }
+
+    public Double getVelocidadKmh() {
+        return velocidadKmh;
+    }
+
+    public void setVelocidadKmh(Double velocidadKmh) {
+        this.velocidadKmh = velocidadKmh;
     }
 
     /**

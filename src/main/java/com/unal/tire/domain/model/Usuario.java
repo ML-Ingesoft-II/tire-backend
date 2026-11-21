@@ -18,12 +18,18 @@ public class Usuario {
     private RolUsuario rol;
     private UUID flotaId;
     private boolean activo;
+    private boolean debeCambiarPassword;
 
     public Usuario() {
     }
 
     public Usuario(UUID id, String email, String passwordHash, String nombre,
                    RolUsuario rol, UUID flotaId, boolean activo) {
+        this(id, email, passwordHash, nombre, rol, flotaId, activo, false);
+    }
+
+    public Usuario(UUID id, String email, String passwordHash, String nombre,
+                   RolUsuario rol, UUID flotaId, boolean activo, boolean debeCambiarPassword) {
         this.id = id;
         this.email = email;
         this.passwordHash = passwordHash;
@@ -31,6 +37,15 @@ public class Usuario {
         this.rol = rol;
         this.flotaId = flotaId;
         this.activo = activo;
+        this.debeCambiarPassword = debeCambiarPassword;
+    }
+
+    /**
+     * Cambia la contrasena y marca que ya no usa la contrasena inicial.
+     */
+    public void cambiarPassword(String nuevoHash) {
+        this.passwordHash = nuevoHash;
+        this.debeCambiarPassword = false;
     }
 
     public UUID getId() {
@@ -87,6 +102,14 @@ public class Usuario {
 
     public void setActivo(boolean activo) {
         this.activo = activo;
+    }
+
+    public boolean isDebeCambiarPassword() {
+        return debeCambiarPassword;
+    }
+
+    public void setDebeCambiarPassword(boolean debeCambiarPassword) {
+        this.debeCambiarPassword = debeCambiarPassword;
     }
 
     @Override
