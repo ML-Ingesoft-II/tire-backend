@@ -15,5 +15,6 @@ public record ClaimsAutenticacion(
         UUID usuarioId,
         String email,
         RolUsuario rol,
-        UUID flotaId) {
+        UUID flotaId,
+        boolean debeCambiarPassword) {
 }

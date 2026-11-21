@@ -19,5 +19,14 @@ public interface ViajeRepositoryPort {
 
     List<Viaje> listarPorEstado(EstadoViaje estado);
 
+    /** Viajes de un conductor, mas reciente primero. */
+    List<Viaje> listarPorConductor(UUID conductorId);
+
+    /** Viajes de los conductores indicados (una flota), mas reciente primero. */
+    List<Viaje> listarPorConductores(java.util.Collection<UUID> conductorIds);
+
     boolean existeViajeEnCursoParaConductor(UUID conductorId);
+
+    /** Viaje en curso de un conductor, si lo tiene. */
+    Optional<Viaje> buscarEnCursoDeConductor(UUID conductorId);
 }

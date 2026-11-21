@@ -14,4 +14,7 @@ public interface SpringDataUsuarioRepository extends JpaRepository<UsuarioJpaEnt
     Optional<UsuarioJpaEntity> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    java.util.List<UsuarioJpaEntity> findByFlotaIdAndRol(
+            UUID flotaId, com.unal.tire.domain.valueobject.RolUsuario rol);
 }

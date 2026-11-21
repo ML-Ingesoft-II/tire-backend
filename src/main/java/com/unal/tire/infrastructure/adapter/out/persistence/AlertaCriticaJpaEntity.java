@@ -1,9 +1,12 @@
 package com.unal.tire.infrastructure.adapter.out.persistence;
 
+import com.unal.tire.domain.valueobject.TipoEvento;
 import com.unal.tire.infrastructure.adapter.out.persistence.embeddable.UbicacionEmbeddable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -29,6 +32,19 @@ public class AlertaCriticaJpaEntity {
     @Column(name = "flota_id")
     private UUID flotaId;
 
+    @Column(name = "evento_id")
+    private UUID eventoId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_evento", length = 30)
+    private TipoEvento tipoEvento;
+
+    @Column(name = "duracion_segundos")
+    private Double duracionSegundos;
+
+    @Column(name = "fecha_evento")
+    private LocalDateTime fechaEvento;
+
     @Column(name = "fecha_apertura", nullable = false)
     private LocalDateTime fechaApertura;
 
@@ -41,6 +57,12 @@ public class AlertaCriticaJpaEntity {
     @Column(name = "atendida", nullable = false)
     private boolean atendida;
 
+    @Column(name = "atendida_por_id")
+    private UUID atendidaPorId;
+
+    @Column(name = "atendida_por_nombre")
+    private String atendidaPorNombre;
+
     @Column(name = "notas_despachador", length = 1000)
     private String notasDespachador;
 
@@ -48,17 +70,25 @@ public class AlertaCriticaJpaEntity {
     }
 
     public AlertaCriticaJpaEntity(UUID id, UUID viajeId, UUID conductorId, UUID flotaId,
-                                  LocalDateTime fechaApertura, LocalDateTime fechaAtencion,
-                                  UbicacionEmbeddable ultimaUbicacion, boolean atendida,
+                                  UUID eventoId, TipoEvento tipoEvento, Double duracionSegundos,
+                                  LocalDateTime fechaEvento, LocalDateTime fechaApertura,
+                                  LocalDateTime fechaAtencion, UbicacionEmbeddable ultimaUbicacion,
+                                  boolean atendida, UUID atendidaPorId, String atendidaPorNombre,
                                   String notasDespachador) {
         this.id = id;
         this.viajeId = viajeId;
         this.conductorId = conductorId;
         this.flotaId = flotaId;
+        this.eventoId = eventoId;
+        this.tipoEvento = tipoEvento;
+        this.duracionSegundos = duracionSegundos;
+        this.fechaEvento = fechaEvento;
         this.fechaApertura = fechaApertura;
         this.fechaAtencion = fechaAtencion;
         this.ultimaUbicacion = ultimaUbicacion;
         this.atendida = atendida;
+        this.atendidaPorId = atendidaPorId;
+        this.atendidaPorNombre = atendidaPorNombre;
         this.notasDespachador = notasDespachador;
     }
 
@@ -78,6 +108,22 @@ public class AlertaCriticaJpaEntity {
         return flotaId;
     }
 
+    public UUID getEventoId() {
+        return eventoId;
+    }
+
+    public TipoEvento getTipoEvento() {
+        return tipoEvento;
+    }
+
+    public Double getDuracionSegundos() {
+        return duracionSegundos;
+    }
+
+    public LocalDateTime getFechaEvento() {
+        return fechaEvento;
+    }
+
     public LocalDateTime getFechaApertura() {
         return fechaApertura;
     }
@@ -92,6 +138,14 @@ public class AlertaCriticaJpaEntity {
 
     public boolean isAtendida() {
         return atendida;
+    }
+
+    public UUID getAtendidaPorId() {
+        return atendidaPorId;
+    }
+
+    public String getAtendidaPorNombre() {
+        return atendidaPorNombre;
     }
 
     public String getNotasDespachador() {

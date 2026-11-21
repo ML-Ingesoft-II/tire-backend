@@ -12,4 +12,11 @@ import org.springframework.stereotype.Repository;
 public interface SpringDataAlertaCriticaRepository extends JpaRepository<AlertaCriticaJpaEntity, UUID> {
 
     List<AlertaCriticaJpaEntity> findByAtendida(boolean atendida);
+
+    List<AlertaCriticaJpaEntity> findByFlotaIdAndAtendidaOrderByFechaAperturaDesc(
+            UUID flotaId, boolean atendida);
+
+    List<AlertaCriticaJpaEntity> findByFlotaIdOrderByFechaAperturaDesc(UUID flotaId);
+
+    java.util.Optional<AlertaCriticaJpaEntity> findByEventoId(UUID eventoId);
 }

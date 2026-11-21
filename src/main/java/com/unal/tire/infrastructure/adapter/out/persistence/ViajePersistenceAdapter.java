@@ -6,6 +6,7 @@ import com.unal.tire.domain.model.Viaje;
 import com.unal.tire.domain.valueobject.EstadoViaje;
 import com.unal.tire.infrastructure.adapter.out.persistence.embeddable.CondicionClimaticaEmbeddable;
 import com.unal.tire.infrastructure.adapter.out.persistence.embeddable.UbicacionEmbeddable;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,8 +48,31 @@ public class ViajePersistenceAdapter implements ViajeRepositoryPort {
     }
 
     @Override
+    public List<Viaje> listarPorConductor(UUID conductorId) {
+        return repository.findByConductorIdOrderByFechaInicioDesc(conductorId).stream()
+                .map(ViajePersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Viaje> listarPorConductores(Collection<UUID> conductorIds) {
+        if (conductorIds == null || conductorIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByConductorIdInOrderByFechaInicioDesc(conductorIds).stream()
+                .map(ViajePersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existeViajeEnCursoParaConductor(UUID conductorId) {
         return repository.existsByConductorIdAndEstado(conductorId, EstadoViaje.EN_CURSO);
+    }
+
+    @Override
+    public Optional<Viaje> buscarEnCursoDeConductor(UUID conductorId) {
+        return repository.findFirstByConductorIdAndEstado(conductorId, EstadoViaje.EN_CURSO)
+                .map(ViajePersistenceAdapter::toDomain);
     }
 
     private static ViajeJpaEntity toEntity(Viaje v) {
@@ -67,6 +91,8 @@ public class ViajePersistenceAdapter implements ViajeRepositoryPort {
                 v.getFechaFin(),
                 UbicacionEmbeddable.desdeDominio(v.getUltimaUbicacion()),
                 CondicionClimaticaEmbeddable.desdeDominio(v.getUltimoClima()),
+                v.getUltimaSenalEn(),
+                v.getVelocidadKmh(),
                 new java.util.ArrayList<>(eventos));
     }
 
@@ -74,10 +100,12 @@ public class ViajePersistenceAdapter implements ViajeRepositoryPort {
         return new EventoFatigaJpaEntity(
                 e.getId(),
                 e.getViajeId(),
+                e.getTipoEvento(),
                 e.getFechaHora(),
                 UbicacionEmbeddable.desdeDominio(e.getUbicacion()),
-                e.getDuracionOjosCerradosSegundos(),
-                e.isConfirmadoPorConductor(),
+                e.getDuracionSegundos(),
+                e.getRespondio(),
+                e.getTiempoRespuestaSegundos(),
                 CondicionClimaticaEmbeddable.desdeDominio(e.getClimaEnRuta()));
     }
 
@@ -97,6 +125,8 @@ public class ViajePersistenceAdapter implements ViajeRepositoryPort {
                 e.getFechaFin(),
                 e.getUltimaUbicacion() != null ? e.getUltimaUbicacion().aDominio() : null,
                 e.getUltimoClima() != null ? e.getUltimoClima().aDominio() : null,
+                e.getUltimaSenalEn(),
+                e.getVelocidadKmh(),
                 eventos);
     }
 
@@ -104,10 +134,12 @@ public class ViajePersistenceAdapter implements ViajeRepositoryPort {
         return new EventoFatiga(
                 e.getId(),
                 e.getViajeId(),
+                e.getTipoEvento(),
                 e.getFechaHora(),
                 e.getUbicacion() != null ? e.getUbicacion().aDominio() : null,
-                e.getDuracionOjosCerradosSegundos(),
-                e.isConfirmadoPorConductor(),
+                e.getDuracionSegundos(),
+                e.getRespondio(),
+                e.getTiempoRespuestaSegundos(),
                 e.getClimaEnRuta() != null ? e.getClimaEnRuta().aDominio() : null);
     }
 }

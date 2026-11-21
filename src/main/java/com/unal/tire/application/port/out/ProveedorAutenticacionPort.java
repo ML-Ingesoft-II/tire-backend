@@ -1,6 +1,7 @@
 package com.unal.tire.application.port.out;
 
 import com.unal.tire.domain.model.Usuario;
+import java.util.UUID;
 
 /**
  * Puerto de salida (Target del patron GoF <b>Adapter</b>) que abstrae el
@@ -18,5 +19,17 @@ public interface ProveedorAutenticacionPort {
 
     String emitirToken(Usuario usuario);
 
+    /**
+     * Emite un refresh token de larga duracion asociado al usuario.
+     */
+    String emitirRefreshToken(Usuario usuario);
+
     ClaimsAutenticacion validarToken(String token);
+
+    /**
+     * Valida un refresh token y devuelve el id del usuario al que pertenece.
+     *
+     * @throws RuntimeException si el token no es un refresh token valido.
+     */
+    UUID validarRefreshToken(String refreshToken);
 }
