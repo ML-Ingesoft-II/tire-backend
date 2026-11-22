@@ -22,6 +22,8 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
 
     private static final URI TYPE_FORBIDDEN =
             URI.create("https://tire.unal.com/problems/forbidden");
+    private static final URI TYPE_PASSWORD_CHANGE =
+            URI.create("https://tire.unal.com/problems/password-change-required");
 
     private final ObjectMapper objectMapper;
 
@@ -32,6 +34,17 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {
+        if (accessDeniedException instanceof CambioPasswordRequeridoSecurityException) {
+            ProblemDetailWriter.write(
+                    response,
+                    request,
+                    HttpStatus.FORBIDDEN,
+                    TYPE_PASSWORD_CHANGE,
+                    "Cambio de contraseña requerido",
+                    "Debes cambiar tu contraseña inicial antes de continuar.",
+                    objectMapper);
+            return;
+        }
         ProblemDetailWriter.write(
                 response,
                 request,

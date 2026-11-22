@@ -30,7 +30,9 @@ public class SecurityConfig {
     private static final String[] RUTAS_PUBLICAS = {
             "/auth/registro",
             "/auth/sesion",
+            "/auth/renovar",
             "/auth/recuperacion",
+            "/auth/recuperacion/confirmar",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api-docs/**",

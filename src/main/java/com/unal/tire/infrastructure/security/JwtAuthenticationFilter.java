@@ -37,12 +37,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final ProveedorAutenticacionPort proveedorAutenticacion;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
 
     public JwtAuthenticationFilter(
             ProveedorAutenticacionPort proveedorAutenticacion,
-            CustomAuthenticationEntryPoint authenticationEntryPoint) {
+            CustomAuthenticationEntryPoint authenticationEntryPoint,
+            CustomAccessDeniedHandler accessDeniedHandler) {
         this.proveedorAutenticacion = proveedorAutenticacion;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
+    }
+
+    /**
+     * Rutas que un usuario con contrasena inicial pendiente puede usar (HU-03):
+     * {@code PUT /auth/contrasena} y {@code POST /auth/renovar}.
+     */
+    private boolean esRutaPermitidaConCambioPendiente(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String metodo = request.getMethod();
+        return ("PUT".equals(metodo) && "/auth/contrasena".equals(uri))
+                || ("POST".equals(metodo) && "/auth/renovar".equals(uri));
     }
 
     @Override
@@ -60,6 +74,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             ClaimsAutenticacion claims = proveedorAutenticacion.validarToken(token);
+
+            // Enforcement HU-03: si aun usa la contrasena inicial, solo puede
+            // acceder a PUT /auth/contrasena y POST /auth/renovar.
+            if (claims.debeCambiarPassword() && !esRutaPermitidaConCambioPendiente(request)) {
+                SecurityContextHolder.clearContext();
+                accessDeniedHandler.handle(
+                        request,
+                        response,
+                        new CambioPasswordRequeridoSecurityException());
+                return;
+            }
 
             var authority = new SimpleGrantedAuthority("ROLE_" + claims.rol().name());
             var authentication = new UsernamePasswordAuthenticationToken(
