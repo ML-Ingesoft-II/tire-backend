@@ -1,20 +1,12 @@
 package com.unal.tire.infrastructure.adapter.in.rest.dto;
 
-import com.unal.tire.domain.valueobject.RolUsuario;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.util.UUID;
 
 /**
- * Datos de entrada para el registro de un usuario.
- *
- * @param nombre   nombre del usuario (obligatorio).
- * @param email    correo electronico valido (obligatorio).
- * @param password contrasena, minimo 8 caracteres (obligatorio).
- * @param rol      rol funcional (obligatorio).
- * @param flotaId  flota asociada (opcional).
+ * Datos de entrada para registrar un conductor particular ({@code RegistroRequest}).
  */
 public record RegistroRequestDto(
         @NotBlank(message = "El nombre es obligatorio")
@@ -28,8 +20,10 @@ public record RegistroRequestDto(
         @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
         String password,
 
-        @NotNull(message = "El rol es obligatorio")
-        RolUsuario rol,
+        Boolean aceptaTratamientoDatos) {
 
-        UUID flotaId) {
+    @AssertTrue(message = "Debes aceptar el tratamiento de datos")
+    public boolean isAceptaTratamientoDatosValido() {
+        return Boolean.TRUE.equals(aceptaTratamientoDatos);
+    }
 }

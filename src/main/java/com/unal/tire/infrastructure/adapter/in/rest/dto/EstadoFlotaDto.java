@@ -1,31 +1,25 @@
 package com.unal.tire.infrastructure.adapter.in.rest.dto;
 
-import com.unal.tire.domain.model.Viaje;
-import com.unal.tire.domain.valueobject.NivelAlerta;
+import com.unal.tire.application.port.in.GestionAlertasUseCase.EstadoFlota;
+import com.unal.tire.domain.valueobject.EstadoMonitoreo;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * Resumen del estado de la flota para el panel del despachador.
- *
- * @param totalViajesActivos cantidad de viajes en curso.
- * @param conteoPorNivel     cantidad de viajes activos por nivel de alerta.
- * @param viajesActivos      detalle de los viajes activos.
+ * Estado de la flota para el panel del despachador ({@code EstadoFlotaResponse}).
  */
 public record EstadoFlotaDto(
-        int totalViajesActivos,
-        Map<NivelAlerta, Long> conteoPorNivel,
-        List<ViajeResponseDto> viajesActivos) {
+        LocalDateTime actualizadoEn,
+        Map<EstadoMonitoreo, Integer> conteoPorEstado,
+        List<ConductorEnViajeDto> conductoresEnViaje,
+        List<ConductorSinViajeDto> conductoresSinViaje) {
 
-    public static EstadoFlotaDto desde(List<Viaje> viajesActivos) {
-        Map<NivelAlerta, Long> conteo = viajesActivos.stream()
-                .collect(Collectors.groupingBy(Viaje::getNivelAlerta, Collectors.counting()));
-
-        List<ViajeResponseDto> detalle = viajesActivos.stream()
-                .map(ViajeResponseDto::desde)
-                .toList();
-
-        return new EstadoFlotaDto(viajesActivos.size(), conteo, detalle);
+    public static EstadoFlotaDto desde(EstadoFlota estado) {
+        return new EstadoFlotaDto(
+                estado.actualizadoEn(),
+                estado.conteoPorEstado(),
+                estado.conductoresEnViaje().stream().map(ConductorEnViajeDto::desde).toList(),
+                estado.conductoresSinViaje().stream().map(ConductorSinViajeDto::desde).toList());
     }
 }
