@@ -133,6 +133,41 @@ El servicio queda disponible en `http://localhost:8080`.
 
 > El esquema se crea/actualiza automáticamente (`spring.jpa.hibernate.ddl-auto=update`).
 
+### 4. Cargar datos de ejemplo (seeder)
+
+Para poblar la base con datos de demostración —la flota **Transportes Andinos**,
+la despachadora **Laura Gómez**, 24 conductores con sus viajes en curso, eventos
+de fatiga e incidentes del turno— arranca el backend con el perfil `seed`:
+
+```bash
+SPRING_PROFILES_ACTIVE=seed ./mvnw spring-boot:run
+```
+
+Qué hace este perfil:
+
+- Ejecuta `SeedDataRunner` (un `CommandLineRunner` anotado con `@Profile("seed")`),
+  que reproduce el escenario del panel del despachador del Prototipo 1.
+- Es **idempotente**: si la flota de ejemplo ya existe, no vuelve a sembrar.
+- **Recrea el esquema desde cero** (`ddl-auto=create-drop`, definido en
+  `application-seed.yml`), por lo que **borra los datos existentes** en cada
+  arranque con este perfil. Úsalo solo en desarrollo.
+
+Credenciales del despachador sembrado (para el panel web):
+
+| Campo | Valor |
+|---|---|
+| Correo | `laura.gomez@tandinos.co` |
+| Contraseña | `Password123` |
+
+Los conductores se crean con su contraseña inicial (primer apellido + últimos 4
+dígitos del documento) y `debeCambiarPassword=true`.
+
+Para arrancar **sin** sembrar (datos reales, esquema conservado), ejecuta el
+backend sin el perfil: `./mvnw spring-boot:run`.
+
+> También puedes activar el perfil con una variable de JVM:
+> `./mvnw spring-boot:run -Dspring-boot.run.profiles=seed`.
+
 ### Alternativa: todo en contenedores
 
 El `Dockerfile` es multi-stage (build con Maven + Temurin 17, runtime con JRE 17
