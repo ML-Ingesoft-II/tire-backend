@@ -2,6 +2,8 @@ package com.unal.tire.infrastructure.adapter.out.persistence;
 
 import com.unal.tire.application.port.out.UsuarioRepositoryPort;
 import com.unal.tire.domain.model.Usuario;
+import com.unal.tire.domain.valueobject.RolUsuario;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -22,8 +24,7 @@ public class UsuarioPersistenceAdapter implements UsuarioRepositoryPort {
 
     @Override
     public Usuario guardar(Usuario u) {
-        UsuarioJpaEntity entidad = toEntity(u);
-        return toDomain(repository.save(entidad));
+        return toDomain(repository.save(toEntity(u)));
     }
 
     @Override
@@ -41,6 +42,13 @@ public class UsuarioPersistenceAdapter implements UsuarioRepositoryPort {
         return repository.existsByEmail(email);
     }
 
+    @Override
+    public List<Usuario> listarPorFlotaYRol(UUID flotaId, RolUsuario rol) {
+        return repository.findByFlotaIdAndRol(flotaId, rol).stream()
+                .map(UsuarioPersistenceAdapter::toDomain)
+                .toList();
+    }
+
     private static UsuarioJpaEntity toEntity(Usuario u) {
         return new UsuarioJpaEntity(
                 u.getId(),
@@ -49,7 +57,8 @@ public class UsuarioPersistenceAdapter implements UsuarioRepositoryPort {
                 u.getNombre(),
                 u.getRol(),
                 u.getFlotaId(),
-                u.isActivo());
+                u.isActivo(),
+                u.isDebeCambiarPassword());
     }
 
     private static Usuario toDomain(UsuarioJpaEntity e) {
@@ -60,6 +69,7 @@ public class UsuarioPersistenceAdapter implements UsuarioRepositoryPort {
                 e.getNombre(),
                 e.getRol(),
                 e.getFlotaId(),
-                e.isActivo());
+                e.isActivo(),
+                e.isDebeCambiarPassword());
     }
 }

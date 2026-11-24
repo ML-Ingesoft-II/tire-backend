@@ -37,16 +37,41 @@ public class AlertaCriticaPersistenceAdapter implements AlertaCriticaRepositoryP
                 .toList();
     }
 
+    @Override
+    public List<AlertaCritica> listarPorFlotaYAtendida(UUID flotaId, boolean atendida) {
+        return repository.findByFlotaIdAndAtendidaOrderByFechaAperturaDesc(flotaId, atendida).stream()
+                .map(AlertaCriticaPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AlertaCritica> listarPorFlota(UUID flotaId) {
+        return repository.findByFlotaIdOrderByFechaAperturaDesc(flotaId).stream()
+                .map(AlertaCriticaPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Optional<AlertaCritica> buscarPorEventoId(UUID eventoId) {
+        return repository.findByEventoId(eventoId).map(AlertaCriticaPersistenceAdapter::toDomain);
+    }
+
     private static AlertaCriticaJpaEntity toEntity(AlertaCritica a) {
         return new AlertaCriticaJpaEntity(
                 a.getId(),
                 a.getViajeId(),
                 a.getConductorId(),
                 a.getFlotaId(),
+                a.getEventoId(),
+                a.getTipoEvento(),
+                a.getDuracionSegundos(),
+                a.getFechaEvento(),
                 a.getFechaApertura(),
                 a.getFechaAtencion(),
                 UbicacionEmbeddable.desdeDominio(a.getUltimaUbicacion()),
                 a.isAtendida(),
+                a.getAtendidaPorId(),
+                a.getAtendidaPorNombre(),
                 a.getNotasDespachador());
     }
 
@@ -56,10 +81,16 @@ public class AlertaCriticaPersistenceAdapter implements AlertaCriticaRepositoryP
                 e.getViajeId(),
                 e.getConductorId(),
                 e.getFlotaId(),
+                e.getEventoId(),
+                e.getTipoEvento(),
+                e.getDuracionSegundos(),
+                e.getFechaEvento(),
                 e.getFechaApertura(),
                 e.getFechaAtencion(),
                 e.getUltimaUbicacion() != null ? e.getUltimaUbicacion().aDominio() : null,
                 e.isAtendida(),
+                e.getAtendidaPorId(),
+                e.getAtendidaPorNombre(),
                 e.getNotasDespachador());
     }
 }

@@ -1,10 +1,13 @@
 package com.unal.tire.infrastructure.adapter.out.persistence;
 
+import com.unal.tire.domain.valueobject.TipoEvento;
 import com.unal.tire.infrastructure.adapter.out.persistence.embeddable.CondicionClimaticaEmbeddable;
 import com.unal.tire.infrastructure.adapter.out.persistence.embeddable.UbicacionEmbeddable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -25,17 +28,24 @@ public class EventoFatigaJpaEntity {
     @Column(name = "viaje_id", nullable = false)
     private UUID viajeId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_evento", nullable = false, length = 30)
+    private TipoEvento tipoEvento;
+
     @Column(name = "fecha_hora", nullable = false)
     private LocalDateTime fechaHora;
 
     @Embedded
     private UbicacionEmbeddable ubicacion;
 
-    @Column(name = "duracion_ojos_cerrados_segundos", nullable = false)
-    private double duracionOjosCerradosSegundos;
+    @Column(name = "duracion_segundos", nullable = false)
+    private double duracionSegundos;
 
-    @Column(name = "confirmado_por_conductor", nullable = false)
-    private boolean confirmadoPorConductor;
+    @Column(name = "respondio")
+    private Boolean respondio;
+
+    @Column(name = "tiempo_respuesta_segundos")
+    private Double tiempoRespuestaSegundos;
 
     @Embedded
     private CondicionClimaticaEmbeddable climaEnRuta;
@@ -43,16 +53,18 @@ public class EventoFatigaJpaEntity {
     protected EventoFatigaJpaEntity() {
     }
 
-    public EventoFatigaJpaEntity(UUID id, UUID viajeId, LocalDateTime fechaHora,
-                                 UbicacionEmbeddable ubicacion, double duracionOjosCerradosSegundos,
-                                 boolean confirmadoPorConductor,
+    public EventoFatigaJpaEntity(UUID id, UUID viajeId, TipoEvento tipoEvento, LocalDateTime fechaHora,
+                                 UbicacionEmbeddable ubicacion, double duracionSegundos,
+                                 Boolean respondio, Double tiempoRespuestaSegundos,
                                  CondicionClimaticaEmbeddable climaEnRuta) {
         this.id = id;
         this.viajeId = viajeId;
+        this.tipoEvento = tipoEvento;
         this.fechaHora = fechaHora;
         this.ubicacion = ubicacion;
-        this.duracionOjosCerradosSegundos = duracionOjosCerradosSegundos;
-        this.confirmadoPorConductor = confirmadoPorConductor;
+        this.duracionSegundos = duracionSegundos;
+        this.respondio = respondio;
+        this.tiempoRespuestaSegundos = tiempoRespuestaSegundos;
         this.climaEnRuta = climaEnRuta;
     }
 
@@ -64,6 +76,10 @@ public class EventoFatigaJpaEntity {
         return viajeId;
     }
 
+    public TipoEvento getTipoEvento() {
+        return tipoEvento;
+    }
+
     public LocalDateTime getFechaHora() {
         return fechaHora;
     }
@@ -72,12 +88,16 @@ public class EventoFatigaJpaEntity {
         return ubicacion;
     }
 
-    public double getDuracionOjosCerradosSegundos() {
-        return duracionOjosCerradosSegundos;
+    public double getDuracionSegundos() {
+        return duracionSegundos;
     }
 
-    public boolean isConfirmadoPorConductor() {
-        return confirmadoPorConductor;
+    public Boolean getRespondio() {
+        return respondio;
+    }
+
+    public Double getTiempoRespuestaSegundos() {
+        return tiempoRespuestaSegundos;
     }
 
     public CondicionClimaticaEmbeddable getClimaEnRuta() {

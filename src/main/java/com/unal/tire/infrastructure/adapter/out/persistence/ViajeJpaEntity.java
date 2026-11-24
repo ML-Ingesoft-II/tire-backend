@@ -59,6 +59,12 @@ public class ViajeJpaEntity {
     @Embedded
     private CondicionClimaticaEmbeddable ultimoClima;
 
+    @Column(name = "ultima_senal_en")
+    private LocalDateTime ultimaSenalEn;
+
+    @Column(name = "velocidad_kmh")
+    private Double velocidadKmh;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "viaje_fk")
     private List<EventoFatigaJpaEntity> eventosFatiga = new ArrayList<>();
@@ -69,8 +75,8 @@ public class ViajeJpaEntity {
     public ViajeJpaEntity(UUID id, UUID conductorId, String origen, String destino,
                           EstadoViaje estado, NivelAlerta nivelAlerta, LocalDateTime fechaInicio,
                           LocalDateTime fechaFin, UbicacionEmbeddable ultimaUbicacion,
-                          CondicionClimaticaEmbeddable ultimoClima,
-                          List<EventoFatigaJpaEntity> eventosFatiga) {
+                          CondicionClimaticaEmbeddable ultimoClima, LocalDateTime ultimaSenalEn,
+                          Double velocidadKmh, List<EventoFatigaJpaEntity> eventosFatiga) {
         this.id = id;
         this.conductorId = conductorId;
         this.origen = origen;
@@ -81,6 +87,8 @@ public class ViajeJpaEntity {
         this.fechaFin = fechaFin;
         this.ultimaUbicacion = ultimaUbicacion;
         this.ultimoClima = ultimoClima;
+        this.ultimaSenalEn = ultimaSenalEn;
+        this.velocidadKmh = velocidadKmh;
         this.eventosFatiga = eventosFatiga != null ? eventosFatiga : new ArrayList<>();
     }
 
@@ -122,6 +130,14 @@ public class ViajeJpaEntity {
 
     public CondicionClimaticaEmbeddable getUltimoClima() {
         return ultimoClima;
+    }
+
+    public LocalDateTime getUltimaSenalEn() {
+        return ultimaSenalEn;
+    }
+
+    public Double getVelocidadKmh() {
+        return velocidadKmh;
     }
 
     public List<EventoFatigaJpaEntity> getEventosFatiga() {

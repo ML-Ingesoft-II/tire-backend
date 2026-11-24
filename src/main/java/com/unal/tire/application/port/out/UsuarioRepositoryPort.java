@@ -1,6 +1,8 @@
 package com.unal.tire.application.port.out;
 
 import com.unal.tire.domain.model.Usuario;
+import com.unal.tire.domain.valueobject.RolUsuario;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,4 +21,10 @@ public interface UsuarioRepositoryPort {
     Optional<Usuario> buscarPorId(UUID id);
 
     boolean existePorEmail(String email);
+
+    /**
+     * Usuarios de una flota con un rol dado (p. ej. todos los CONDUCTOR de la
+     * flota del despachador).
+     */
+    List<Usuario> listarPorFlotaYRol(UUID flotaId, RolUsuario rol);
 }

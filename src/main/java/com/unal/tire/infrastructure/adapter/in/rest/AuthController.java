@@ -6,13 +6,15 @@ import com.unal.tire.application.port.in.RespuestaToken;
 import com.unal.tire.application.port.out.ClaimsAutenticacion;
 import com.unal.tire.domain.model.Usuario;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.CambioPasswordDto;
+import com.unal.tire.infrastructure.adapter.in.rest.dto.ConfirmarRecuperacionDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.LoginRequestDto;
+import com.unal.tire.infrastructure.adapter.in.rest.dto.MensajeResponseDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.RecuperacionPasswordDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.RegistroRequestDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.RegistroResponseDto;
+import com.unal.tire.infrastructure.adapter.in.rest.dto.RenovarSesionDto;
 import com.unal.tire.infrastructure.adapter.in.rest.dto.TokenResponseDto;
 import jakarta.validation.Valid;
-import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Adaptador de entrada REST para el modulo de autenticacion y acceso.
+ * Adaptador de entrada REST para el modulo de autenticacion y acceso (HU-01 a HU-04).
  */
 @RestController
 @RequestMapping("/auth")
@@ -37,13 +39,10 @@ public class AuthController {
 
     @PostMapping("/registro")
     public ResponseEntity<RegistroResponseDto> registrar(@Valid @RequestBody RegistroRequestDto request) {
-        Usuario usuario = autenticacionUseCase.registrarUsuario(new ComandoRegistro(
+        Usuario usuario = autenticacionUseCase.registrarConductorParticular(new ComandoRegistro(
                 request.nombre(),
                 request.email(),
-                request.password(),
-                request.rol(),
-                request.flotaId()));
-
+                request.password()));
         return ResponseEntity.status(HttpStatus.CREATED).body(RegistroResponseDto.desde(usuario));
     }
 
@@ -51,6 +50,12 @@ public class AuthController {
     public ResponseEntity<TokenResponseDto> iniciarSesion(@Valid @RequestBody LoginRequestDto request) {
         RespuestaToken respuesta = autenticacionUseCase.iniciarSesion(
                 request.email(), request.password());
+        return ResponseEntity.ok(TokenResponseDto.desde(respuesta));
+    }
+
+    @PostMapping("/renovar")
+    public ResponseEntity<TokenResponseDto> renovar(@Valid @RequestBody RenovarSesionDto request) {
+        RespuestaToken respuesta = autenticacionUseCase.renovarSesion(request.refreshToken());
         return ResponseEntity.ok(TokenResponseDto.desde(respuesta));
     }
 
@@ -66,10 +71,17 @@ public class AuthController {
     }
 
     @PostMapping("/recuperacion")
-    public ResponseEntity<Map<String, String>> recuperarContrasena(
+    public ResponseEntity<MensajeResponseDto> recuperarContrasena(
             @Valid @RequestBody RecuperacionPasswordDto request) {
         autenticacionUseCase.solicitarRecuperacion(request.email());
-        return ResponseEntity.ok(Map.of(
-                "mensaje", "Si el correo está registrado, se enviaron las instrucciones de recuperación."));
+        return ResponseEntity.ok(new MensajeResponseDto(
+                "Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña."));
+    }
+
+    @PostMapping("/recuperacion/confirmar")
+    public ResponseEntity<MensajeResponseDto> confirmarRecuperacion(
+            @Valid @RequestBody ConfirmarRecuperacionDto request) {
+        autenticacionUseCase.confirmarRecuperacion(request.token(), request.passwordNueva());
+        return ResponseEntity.ok(new MensajeResponseDto("Contraseña actualizada. Inicia sesión."));
     }
 }

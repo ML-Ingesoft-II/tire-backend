@@ -5,7 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * Datos de entrada para registrar telemetria de posicion.
+ * Datos de entrada para registrar telemetria ({@code TelemetriaRequest}).
  */
 public record TelemetriaDto(
         @NotNull(message = "La latitud es obligatoria")
@@ -16,5 +16,8 @@ public record TelemetriaDto(
         @NotNull(message = "La longitud es obligatoria")
         @DecimalMin(value = "-180.0", message = "La longitud debe ser >= -180")
         @DecimalMax(value = "180.0", message = "La longitud debe ser <= 180")
-        Double longitud) {
+        Double longitud,
+
+        @DecimalMin(value = "0.0", message = "La velocidad no puede ser negativa")
+        Double velocidadKmh) {
 }

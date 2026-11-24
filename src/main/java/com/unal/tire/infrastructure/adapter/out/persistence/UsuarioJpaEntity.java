@@ -41,11 +41,15 @@ public class UsuarioJpaEntity {
     @Column(name = "activo", nullable = false)
     private boolean activo;
 
+    @Column(name = "debe_cambiar_password", nullable = false)
+    private boolean debeCambiarPassword;
+
     protected UsuarioJpaEntity() {
     }
 
     public UsuarioJpaEntity(UUID id, String email, String passwordHash, String nombre,
-                            RolUsuario rol, UUID flotaId, boolean activo) {
+                            RolUsuario rol, UUID flotaId, boolean activo,
+                            boolean debeCambiarPassword) {
         this.id = id;
         this.email = email;
         this.passwordHash = passwordHash;
@@ -53,6 +57,7 @@ public class UsuarioJpaEntity {
         this.rol = rol;
         this.flotaId = flotaId;
         this.activo = activo;
+        this.debeCambiarPassword = debeCambiarPassword;
     }
 
     public UUID getId() {
@@ -109,5 +114,13 @@ public class UsuarioJpaEntity {
 
     public void setActivo(boolean activo) {
         this.activo = activo;
+    }
+
+    public boolean isDebeCambiarPassword() {
+        return debeCambiarPassword;
+    }
+
+    public void setDebeCambiarPassword(boolean debeCambiarPassword) {
+        this.debeCambiarPassword = debeCambiarPassword;
     }
 }

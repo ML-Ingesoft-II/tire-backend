@@ -14,5 +14,11 @@ public interface SpringDataViajeRepository extends JpaRepository<ViajeJpaEntity,
 
     List<ViajeJpaEntity> findByEstado(EstadoViaje estado);
 
+    List<ViajeJpaEntity> findByConductorIdOrderByFechaInicioDesc(UUID conductorId);
+
+    List<ViajeJpaEntity> findByConductorIdInOrderByFechaInicioDesc(java.util.Collection<UUID> conductorIds);
+
     boolean existsByConductorIdAndEstado(UUID conductorId, EstadoViaje estado);
+
+    java.util.Optional<ViajeJpaEntity> findFirstByConductorIdAndEstado(UUID conductorId, EstadoViaje estado);
 }

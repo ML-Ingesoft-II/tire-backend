@@ -15,4 +15,16 @@ public interface AlertaCriticaRepositoryPort {
     Optional<AlertaCritica> buscarPorId(UUID id);
 
     List<AlertaCritica> listarPorAtendida(boolean atendida);
+
+    /**
+     * Alertas de una flota filtradas por estado de atencion, mas reciente
+     * (fecha de apertura) primero.
+     */
+    List<AlertaCritica> listarPorFlotaYAtendida(UUID flotaId, boolean atendida);
+
+    /** Todas las alertas de una flota (atendidas y abiertas). */
+    List<AlertaCritica> listarPorFlota(UUID flotaId);
+
+    /** Alerta asociada a un evento de fatiga, si existe. */
+    Optional<AlertaCritica> buscarPorEventoId(UUID eventoId);
 }

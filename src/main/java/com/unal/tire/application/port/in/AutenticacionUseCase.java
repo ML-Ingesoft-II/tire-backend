@@ -8,11 +8,21 @@ import java.util.UUID;
  */
 public interface AutenticacionUseCase {
 
-    Usuario registrarUsuario(ComandoRegistro comando);
+    /**
+     * Registra un conductor particular (rol CONDUCTOR, sin flota), ruta publica
+     * del contrato ({@code POST /auth/registro}).
+     */
+    Usuario registrarConductorParticular(ComandoRegistro comando);
 
     RespuestaToken iniciarSesion(String email, String password);
+
+    /** Renueva el par de tokens a partir de un refresh token valido. */
+    RespuestaToken renovarSesion(String refreshToken);
 
     void cambiarContrasena(UUID usuarioId, String passwordActual, String passwordNueva);
 
     void solicitarRecuperacion(String email);
+
+    /** Define una nueva contrasena usando un token de recuperacion de un solo uso. */
+    void confirmarRecuperacion(String token, String passwordNueva);
 }

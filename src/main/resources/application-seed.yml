@@ -1,0 +1,6 @@
+# Perfil "seed": recrea el esquema desde cero y carga datos de ejemplo.
+# Uso:  SPRING_PROFILES_ACTIVE=seed ./mvnw spring-boot:run
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

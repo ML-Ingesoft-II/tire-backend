@@ -1,9 +1,12 @@
 package com.unal.tire.infrastructure.adapter.in.rest.exception;
 
+import com.unal.tire.application.service.GestionViajesService;
 import com.unal.tire.domain.exception.AccesoDenegadoDominioException;
+import com.unal.tire.domain.exception.CambioPasswordRequeridoException;
 import com.unal.tire.domain.exception.ConflictoEstadoException;
 import com.unal.tire.domain.exception.RecursoNoEncontradoException;
 import com.unal.tire.domain.exception.ReglaNegocioException;
+import com.unal.tire.domain.exception.TokenRecuperacionInvalidoException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -41,6 +44,10 @@ public class GlobalExceptionHandler {
             URI.create("https://tire.unal.com/problems/unauthorized");
     private static final URI TYPE_FORBIDDEN =
             URI.create("https://tire.unal.com/problems/forbidden");
+    private static final URI TYPE_PASSWORD_CHANGE =
+            URI.create("https://tire.unal.com/problems/password-change-required");
+    private static final URI TYPE_TOKEN_EXPIRED =
+            URI.create("https://tire.unal.com/problems/token-expired");
     private static final URI TYPE_INTERNAL =
             URI.create("https://tire.unal.com/problems/internal-error");
 
@@ -66,9 +73,33 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleBadRequest(RuntimeException ex, WebRequest request) {
         return baseProblem(
                 HttpStatus.BAD_REQUEST,
-                "Solicitud invalida",
+                "Error de validacion",
                 ex.getMessage(),
-                TYPE_BAD_REQUEST,
+                TYPE_VALIDATION,
+                request);
+    }
+
+    // ---- 403 Forbidden: cambio de contrasena requerido (HU-03) ----
+    @ExceptionHandler(CambioPasswordRequeridoException.class)
+    public ProblemDetail handlePasswordChangeRequired(
+            CambioPasswordRequeridoException ex, WebRequest request) {
+        return baseProblem(
+                HttpStatus.FORBIDDEN,
+                "Cambio de contraseña requerido",
+                ex.getMessage(),
+                TYPE_PASSWORD_CHANGE,
+                request);
+    }
+
+    // ---- 410 Gone: token de recuperacion vencido o usado (HU-04) ----
+    @ExceptionHandler(TokenRecuperacionInvalidoException.class)
+    public ProblemDetail handleTokenExpirado(
+            TokenRecuperacionInvalidoException ex, WebRequest request) {
+        return baseProblem(
+                HttpStatus.GONE,
+                "Enlace vencido",
+                ex.getMessage(),
+                TYPE_TOKEN_EXPIRED,
                 request);
     }
 
@@ -81,6 +112,20 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 TYPE_NOT_FOUND,
                 request);
+    }
+
+    // ---- 409 Conflict: viaje ya activo (incluye viajeId) ----
+    @ExceptionHandler(GestionViajesService.ViajeActivoException.class)
+    public ProblemDetail handleViajeActivo(
+            GestionViajesService.ViajeActivoException ex, WebRequest request) {
+        ProblemDetail problem = baseProblem(
+                HttpStatus.CONFLICT,
+                "Conflicto de estado",
+                ex.getMessage(),
+                TYPE_CONFLICT,
+                request);
+        problem.setProperty("viajeId", ex.getViajeId());
+        return problem;
     }
 
     // ---- 409 Conflict ----
