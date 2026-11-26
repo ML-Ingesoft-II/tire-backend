@@ -122,6 +122,44 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>com/unal/tire/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <formats>
+                        <format>HTML</format>
+                        <format>CSV</format>
+                        <format>XML</format>
+                    </formats>
+                    <excludes>
+                        <exclude>com/unal/tire/TireBackendApplication.class</exclude>
+                        <exclude>com/unal/tire/infrastructure/config/**</exclude>
+                        <exclude>com/unal/tire/infrastructure/adapter/in/rest/dto/**</exclude>
+                        <exclude>com/unal/tire/infrastructure/adapter/out/persistence/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

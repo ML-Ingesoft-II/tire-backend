@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -250,5 +251,147 @@ class TireBackendIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"despachador@tire.com\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void renovarSesionConRefreshTokenValidoDevuelve200YNuevoToken() throws Exception {
+        MvcResult login = mockMvc.perform(post("/auth/sesion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"despachador@tire.com\",\"password\":\"Password123\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String refreshToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+
+        mockMvc.perform(post("/auth/renovar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists())
+                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.rol", is("DESPACHADOR")));
+    }
+
+    @Test
+    void listarConductoresConPaginacionYFiltroDevuelve200() throws Exception {
+        mockMvc.perform(get("/conductores")
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .param("q", "Hernán")
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pagina", is(0)))
+                .andExpect(jsonPath("$.tamano", is(8)))
+                .andExpect(jsonPath("$.totalElementos").exists())
+                .andExpect(jsonPath("$.contenido").isArray());
+    }
+
+    @Test
+    void actualizarYDesactivarConductorConTokenDespachador() throws Exception {
+        String correoUnico = "patch.test." + UUID.randomUUID() + "@tandinos.co";
+        String docUnico = "99" + (System.currentTimeMillis() % 1000000);
+        String body = """
+                {"nombres":"Conductor","apellidos":"Prueba","tipoDocumento":"CC",
+                 "numeroDocumento":"%s","correo":"%s","telefono":"3100000000",
+                 "placaVehiculo":"AAA111"}
+                """.formatted(docUnico, correoUnico);
+
+        MvcResult res = mockMvc.perform(post("/conductores")
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String condId = objectMapper.readTree(res.getResponse().getContentAsString()).get("id").asText();
+
+        // PATCH /conductores/{id}
+        String patchBody = """
+                {"telefono":"3198887766","placaVehiculo":"NEW789"}
+                """;
+        mockMvc.perform(patch("/conductores/" + condId)
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(patchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telefono", is("3198887766")))
+                .andExpect(jsonPath("$.placaVehiculo", is("NEW789")));
+
+        // DELETE /conductores/{id}
+        mockMvc.perform(delete("/conductores/" + condId)
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activo", is(false)));
+    }
+
+    @Test
+    void flujoAlertasCriticasGeneracionConsultaYAtencion() throws Exception {
+        Flota flota = flotaRepository.buscarPorNombre("Flota Test").orElseThrow();
+        UUID cId = UUID.randomUUID();
+        String emailConductor = "cond.flota." + UUID.randomUUID() + "@tandinos.co";
+        usuarioRepository.guardar(new Usuario(
+                cId, emailConductor, auth.hashearContrasena("Password123"),
+                "Conductor Flota Alerta", RolUsuario.CONDUCTOR, flota.getId(), true, false
+        ));
+        String conductorFlotaToken = iniciarSesion(emailConductor, "Password123");
+
+        // 1. Iniciar viaje
+        MvcResult resViaje = mockMvc.perform(post("/viajes")
+                        .header("Authorization", "Bearer " + conductorFlotaToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"latitudInicial\":4.711,\"longitudInicial\":-74.0721}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String vId = objectMapper.readTree(resViaje.getResponse().getContentAsString()).get("id").asText();
+
+        // 2. Evento microsueno sin respuesta -> genera AlertaCritica en la flota
+        String evento = """
+                {"tipoEvento":"MICROSUENO","fechaHoraDeteccion":"2026-11-26T21:00:00",
+                 "duracionSegundos":2.5,"respondio":false,"latitud":5.1462,"longitud":-73.6851}
+                """;
+        mockMvc.perform(post("/viajes/" + vId + "/eventos")
+                        .header("Authorization", "Bearer " + conductorFlotaToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(evento))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nivelAlerta", is("CRITICO")));
+
+        // 3. GET /alertas como despachador
+        MvcResult resAlertas = mockMvc.perform(get("/alertas")
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.[0].id").exists())
+                .andReturn();
+
+        JsonNode alertasArr = objectMapper.readTree(resAlertas.getResponse().getContentAsString());
+        String alertaId = alertasArr.get(0).get("id").asText();
+
+        // 4. GET /alertas/{id}
+        mockMvc.perform(get("/alertas/" + alertaId)
+                        .header("Authorization", "Bearer " + despachadorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(alertaId)))
+                .andExpect(jsonPath("$.lineaTiempo").isArray());
+
+        // 5. PATCH /alertas/{id}/atender
+        String atenderBody = """
+                {"notas":"Atendida por el despachador en prueba de integracion"}
+                """;
+        mockMvc.perform(patch("/alertas/" + alertaId + "/atender")
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(atenderBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atendida", is(true)))
+                .andExpect(jsonPath("$.notasDespachador", is("Atendida por el despachador en prueba de integracion")));
+    }
+
+    @Test
+    void historialEventosConFiltrosYPaginacionDevuelve200() throws Exception {
+        mockMvc.perform(get("/eventos")
+                        .header("Authorization", "Bearer " + despachadorToken)
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pagina", is(0)))
+                .andExpect(jsonPath("$.tamano", is(8)))
+                .andExpect(jsonPath("$.totalElementos").exists())
+                .andExpect(jsonPath("$.contenido").isArray());
     }
 }
