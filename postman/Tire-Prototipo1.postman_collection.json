@@ -736,7 +736,7 @@
       }
     },
     {
-      "name": "18 - GET /incidentes con filtros (200)",
+      "name": "18 - GET /eventos con filtros (200)",
       "event": [
         {
           "listen": "test",
@@ -744,7 +744,13 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
-              "pm.test(\"Respuesta es array\", function () { pm.expect(Array.isArray(pm.response.json())).to.be.true; });"
+              "pm.test(\"Respuesta contiene paginacion y lista de eventos\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('contenido');",
+              "    pm.expect(Array.isArray(jsonData.contenido)).to.be.true;",
+              "    pm.expect(jsonData).to.have.property('pagina');",
+              "    pm.expect(jsonData).to.have.property('totalElementos');",
+              "});"
             ]
           }
         }
@@ -758,12 +764,12 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/incidentes?fechaInicio=2026-01-01T00:00:00&fechaFin=2026-12-31T23:59:59",
+          "raw": "{{baseUrl}}/eventos?fechaInicio=2026-01-01T00:00:00&fechaFin=2026-12-31T23:59:59&page=0&size=10",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "incidentes"
+            "eventos"
           ],
           "query": [
             {
@@ -773,6 +779,14 @@
             {
               "key": "fechaFin",
               "value": "2026-12-31T23:59:59"
+            },
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
             }
           ]
         }

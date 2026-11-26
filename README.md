@@ -1,4 +1,4 @@
-# Tire — Backend (Prototipo 1)
+# Tire — Backend (Prototipo 2 — v0.2.0)
 
 **Tire** es un sistema que previene accidentes viales causados por **microsueños** en
 conductores de transporte de carga y particulares. Detecta episodios de fatiga en
@@ -8,7 +8,7 @@ situación se vuelve crítica.
 Este repositorio contiene el **único backend** del sistema, que conecta:
 
 - Una **App Móvil** (React Native) usada por el rol **CONDUCTOR**.
-- Un **Panel Web** (React) usado por el rol **DESPACHADOR**.
+- Un **Panel Web** (`web-dashboard`, Next.js 14) usado por el rol **DESPACHADOR**.
 
 El backend está construido en **Java 17 + Spring Boot 3.2.5** bajo **Arquitectura
 Hexagonal (Puertos y Adaptadores)** estricta.
@@ -192,42 +192,72 @@ JWT) obtenido de `POST /auth/sesion` para probar los endpoints protegidos.
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/auth/registro` | Público | Registrar usuario |
-| POST | `/auth/sesion` | Público | Iniciar sesión (devuelve JWT) |
+| POST | `/auth/registro` | Público | Registrar usuario (conductor particular) |
+| POST | `/auth/sesion` | Público | Iniciar sesión (devuelve `accessToken` y `refreshToken`) |
+| POST | `/auth/renovar` | Público | Renovar tokens con `refreshToken` |
 | PUT | `/auth/contrasena` | Autenticado | Cambiar contraseña |
 | POST | `/auth/recuperacion` | Público | Solicitar recuperación de contraseña (HU-04) |
-| POST/GET | `/conductores` | DESPACHADOR | Crear / listar conductores |
-| GET/PATCH/DELETE | `/conductores/{id}` | DESPACHADOR | Consultar / actualizar / desactivar |
+| POST | `/auth/recuperacion/confirmar` | Público | Confirmar nueva contraseña con token |
+| POST | `/conductores` | DESPACHADOR | Registrar conductor de la flota |
+| GET | `/conductores` | DESPACHADOR | Listar conductores (paginado, con búsqueda `q`) |
+| GET | `/conductores/{id}` | DESPACHADOR | Consultar detalle de conductor |
+| PATCH | `/conductores/{id}` | DESPACHADOR | Actualizar datos del conductor |
+| DELETE | `/conductores/{id}` | DESPACHADOR | Desactivar conductor (soft-delete) |
 | POST | `/viajes` | CONDUCTOR | Iniciar viaje |
-| GET | `/viajes`, `/viajes/{id}` | CONDUCTOR o DESPACHADOR | Listar / consultar |
+| GET | `/viajes` | CONDUCTOR o DESPACHADOR | Listar viajes (paginado) |
+| GET | `/viajes/activo` | CONDUCTOR | Consultar viaje en curso del conductor |
+| GET | `/viajes/{id}` | CONDUCTOR o DESPACHADOR | Consultar detalle de viaje |
 | PATCH | `/viajes/{id}/finalizar` | CONDUCTOR | Finalizar viaje |
-| DELETE | `/viajes/{id}` | CONDUCTOR o DESPACHADOR | Cancelar viaje |
-| POST | `/viajes/{id}/telemetria` | CONDUCTOR | Registrar telemetría (+ clima) |
+| POST | `/viajes/{id}/telemetria` | CONDUCTOR | Registrar telemetría (+ clima en ruta) |
 | POST | `/viajes/{id}/eventos` | CONDUCTOR | Registrar evento de fatiga |
-| PATCH | `/viajes/{id}/confirmar-alerta` | CONDUCTOR | Confirmar alerta |
-| GET | `/flota/estado` | DESPACHADOR | Estado de la flota |
-| GET | `/alertas` | DESPACHADOR | Alertas abiertas |
-| PATCH | `/alertas/{id}/atender` | DESPACHADOR | Atender alerta |
-| GET | `/incidentes` | DESPACHADOR | Incidentes atendidos |
+| PATCH | `/viajes/{id}/confirmar-alerta` | CONDUCTOR | Confirmar alarma en cabina |
+| GET | `/flota/estado` | DESPACHADOR | Estado en tiempo real de la flota |
+| GET | `/alertas` | DESPACHADOR | Alertas críticas abiertas |
+| GET | `/alertas/{id}` | DESPACHADOR | Detalle de alerta e historial del viaje |
+| PATCH | `/alertas/{id}/atender` | DESPACHADOR | Atender alerta crítica con notas |
+| GET | `/eventos` | DESPACHADOR | Historial de eventos y alertas (paginado) |
 
 ---
 
-## Pruebas
+## Pruebas y Cobertura
 
-### Pruebas automatizadas (JUnit 5 + MockMvc)
+### Pruebas automatizadas (JUnit 5 + Mockito + MockMvc)
 
 Los tests usan **H2 en modo PostgreSQL** (`application-test.yml`), por lo que
 corren en cualquier máquina **sin necesidad de Docker ni PostgreSQL encendidos**:
 
 ```bash
+# En Linux o macOS
 ./mvnw clean test
+
+# En Windows
+.\mvnw.cmd clean test
 ```
 
-La suite `TireBackendIntegrationTest` cubre: registro, login JWT, CRUD de
-conductores, ciclo de vida de viajes, **401** (sin token), **403** (rol cruzado),
-**400** (validación), **409** (doble viaje activo — invariante HU-09), **404**
-(recurso inexistente) y el **patrón State** (microsueño de 2.0 s no confirmado que
-escala a `CRITICO` y abre una alerta para el despachador).
+La suite cuenta con **105 pruebas automatizadas** organizadas en tres capas:
+1. **47 Pruebas unitarias de dominio puro** (`src/test/java/com/unal/tire/domain/`): verifican agregados (`Viaje`, `PerfilConductor`, `Flota`, `Usuario`), entidades (`EventoFatiga`, `AlertaCritica`), Value Objects (`Ubicacion`), y la máquina de estados GoF State del nivel de alerta (`NORMAL → PRECAUCION → CRITICO`).
+2. **43 Pruebas unitarias de aplicación con dobles Mockito** (`src/test/java/com/unal/tire/application/service/`): verifican la orquestación, reglas de negocio e interacción con los puertos en `GestionConductoresServiceTest`, `AutenticacionServiceTest`, `GestionViajesServiceTest` y `GestionAlertasServiceTest`.
+3. **15 Pruebas de integración de la API** (`src/test/java/com/unal/tire/TireBackendIntegrationTest.java`): prueban los endpoints REST mediante `MockMvc` con seguridad JWT, validaciones RFC 9457 (códigos 200, 201, 204, 400, 401, 403, 404, 409), paginación y flujos completos.
+
+### Reporte de Cobertura JaCoCo
+
+El plugin `jacoco-maven-plugin` está integrado en el ciclo de construcción y genera automáticamente el reporte HTML al ejecutar:
+
+```bash
+./mvnw test
+```
+
+Para consultar el reporte interactivo:
+- **Ruta del reporte HTML:** `target/site/jacoco/index.html`
+- Para abrirlo en el navegador:
+  - Linux: `xdg-open target/site/jacoco/index.html`
+  - macOS: `open target/site/jacoco/index.html`
+  - Windows: `start target/site/jacoco/index.html`
+
+**Métricas alcanzadas en el Prototipo 2:**
+- Cobertura de líneas combinada Dominio + Aplicación: **87.75 %** (meta requerida: $\ge 70\ \%$).
+  - Capa Dominio: **80.05 %** de líneas (353 de 441 líneas).
+  - Capa Aplicación: **95.05 %** de líneas (442 de 465 líneas).
 
 ### Pruebas manuales (Postman Collection Runner)
 
