@@ -177,6 +177,43 @@ Alpine). Para construir la imagen del backend:
 docker build -t tire-backend .
 ```
 
+### Ejecutar en modo depuración (breakpoints)
+
+Para seguir una petición de punta a punta con el depurador (por ejemplo, validar
+el flujo de login o una creación mientras el cliente hace la llamada), arranca el
+backend con el agente de depuración de la JVM (JDWP) escuchando en el puerto `5005`:
+
+```bash
+# Linux o macOS
+./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+
+# Windows
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+```
+
+Puedes combinarlo con el perfil `seed` añadiendo `-Dspring-boot.run.profiles=seed`.
+
+Luego conéctate con tu IDE a `localhost:5005` mediante **Remote JVM Debug**:
+
+- **IntelliJ IDEA:** *Run → Edit Configurations → + → Remote JVM Debug*, host
+  `localhost`, puerto `5005`, y pulsa *Debug*.
+- **VS Code** (extensión *Extension Pack for Java*): usa una configuración de
+  tipo `java` con `"request": "attach"`, `"hostName": "localhost"` y
+  `"port": 5005` en `.vscode/launch.json`.
+
+Con el proceso adjunto, pon breakpoints en el filtro JWT
+(`JwtAuthenticationFilter`), los controladores REST
+(`infrastructure.adapter.in.rest`) y los casos de uso
+(`application.service`) para observar las variables y la pila de llamadas en cada
+capa. Un breakpoint **condicional** útil es detenerse solo cuando la respuesta es
+`401`/`403`; un **logpoint** (breakpoint que registra un mensaje sin detener) sirve
+para trazar el valor de un DTO sin interrumpir el flujo.
+
+> Para **depurar una prueba de integración**, ejecuta la clase
+> `TireBackendIntegrationTest` en modo *Debug* desde el IDE (no requiere JDWP
+> remoto: el IDE lanza la JVM de la prueba ya en modo depuración) y coloca el
+> breakpoint en el código de producción que la prueba ejercita.
+
 ---
 
 ## Documentación de la API
